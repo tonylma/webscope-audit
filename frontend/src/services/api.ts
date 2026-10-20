@@ -1,23 +1,46 @@
-import axios from 'axios';
-
-import type { HistoryItem, Report, ScanResult } from '../types';
-
-const api = axios.create({
-  baseURL: 'http://localhost:8000',
-  timeout: 20000,
-});
-
-export async function createScan(url: string): Promise<ScanResult> {
-  const response = await api.post('/scan', { url });
-  return response.data;
+export interface ScanResult {
+  id: number;
+  target_url: string;
+  status: string;
+  risk_score: number;
+  summary: string;
 }
 
-export async function getReport(scanId: number): Promise<Report> {
-  const response = await api.get(`/scan/${scanId}/report`);
-  return response.data;
+export interface HistoryItem {
+  id: number;
+  target_url: string;
+  status: string;
+  risk_score: number;
+  summary: string;
 }
 
-export async function getHistory(): Promise<{ scans: HistoryItem[] }> {
-  const response = await api.get('/history');
-  return response.data;
+export interface FindingItem {
+  category: string;
+  title: string;
+  severity: string;
+  description: string;
+  evidence: string;
+}
+
+export interface SubdomainItem {
+  name: string;
+  ip?: string | null;
+  status: string;
+}
+
+export interface UrlItem {
+  url: string;
+  source: string;
+  status_code: number;
+  depth: number;
+}
+
+export interface Report {
+  scan_id: number;
+  summary: string;
+  risk_score: number;
+  status: string;
+  findings: FindingItem[];
+  subdomains: SubdomainItem[];
+  urls: UrlItem[];
 }

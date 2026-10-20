@@ -1,48 +1,17 @@
-from __future__ import annotations
+.PHONY: up down install frontend backend
 
-from typing import List, Optional
+up:
+	docker compose up --build
 
-from pydantic import BaseModel, Field, HttpUrl
+down:
+	docker compose down -v
 
+install:
+	cd backend && python -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
+	cd frontend && npm install
 
-class ScanCreateRequest(BaseModel):
-    url: HttpUrl = Field(..., description='URL publique à analyser')
+backend:
+	cd backend && . .venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-
-class ScanResult(BaseModel):
-    id: int
-    target_url: str
-    status: str
-    risk_score: float = 0.0
-    summary: str = ''
-
-
-class FindingItem(BaseModel):
-    category: str
-    title: str
-    severity: str
-    description: str = ''
-    evidence: str = ''
-
-
-class SubdomainItem(BaseModel):
-    name: str
-    ip: Optional[str] = None
-    status: str = 'active'
-
-
-class UrlItem(BaseModel):
-    url: str
-    source: str = 'crawl'
-    status_code: int = 200
-    depth: int = 1
-
-
-class ScanReport(BaseModel):
-    scan_id: int
-    summary: str
-    risk_score: float
-    status: str = 'completed'
-    findings: List[FindingItem] = []
-    subdomains: List[SubdomainItem] = []
-    urls: List[UrlItem] = []
+frontend:
+	cd frontend && npm run dev
