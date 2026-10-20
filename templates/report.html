@@ -1,95 +1,84 @@
-from __future__ import annotations
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>WebScope Audit V2</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 2rem; color: #1f2937; }
+      h1, h2, h3 { color: #0f172a; }
+      .meta { background: #f8fafc; border: 1px solid #dbeafe; border-radius: 8px; padding: 1rem; }
+      table { border-collapse: collapse; width: 100%; margin-top: 0.5rem; }
+      th, td { border: 1px solid #d1d5db; padding: 0.5rem; text-align: left; vertical-align: top; }
+      .ok { color: #166534; font-weight: bold; }
+      .warn { color: #92400e; font-weight: bold; }
+      .error { color: #991b1b; font-weight: bold; }
+      pre { white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <h1>WebScope Audit V2</h1>
+    <div class="meta">
+      <p><strong>Cible :</strong> {{ result.target }}</p>
+      <p><strong>Date :</strong> {{ result.collected_at }}</p>
+      <p><strong>Périmètre :</strong> {{ result.scope }}</p>
+    </div>
 
-import argparse
-from pathlib import Path
+    <h2>Résumé</h2>
+    {% if result.errors %}
+      <ul>
+        {% for error in result.errors %}
+          <li>{{ error }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="ok">Aucune erreur critique détectée dans le périmètre actuellement scanné.</p>
+    {% endif %}
 
-from .config import AppConfig
-from .report_generator import write_report_files
-from .scanner import SiteScanner
+    <h2>DNS</h2>
+    <table>
+      <tr><th>Hostname</th><td>{{ result.dns.get('hostname', '') }}</td></tr>
+      <tr><th>Enregistrements</th><td><pre>{{ result.dns.get('records', {}) | tojson(indent=2) }}</pre></td></tr>
+      <tr><th>Erreurs</th><td>{{ result.dns.get('errors', []) | join(', ') }}</td></tr>
+    </table>
 
+    <h2>HTTP / HTTPS</h2>
+    <table>
+      <tr><th>URL</th><td>{{ result.http.get('url', '') }}</td></tr>
+      <tr><th>Statut</th><td>{{ result.http.get('status') }}</td></tr>
+      <tr><th>Final URL</th><td>{{ result.http.get('final_url', '') }}</td></tr>
+      <tr><th>Serveur</th><td>{{ result.http.get('server', '') }}</td></tr>
+      <tr><th>Temps de réponse</th><td>{{ result.http.get('response_time_ms', 0) }} ms</td></tr>
+    </table>
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="WebScope Audit")
-    parser.add_argument("target", nargs="?", default="https://example.com", help="URL publique à analyser")
-    parser.add_argument("--output-dir", default="reports", help="Dossier de sortie pour les rapports")
-    parser.add_argument("--timeout", type=float, default=10.0, help="Délai d'attente en secondes")
-    parser.add_argument("--max-redirects", type=int, default=5, help="Nombre maximal de redirections")
-    parser.add_argument("--db-path", default="reports/webscope_audit.db", help="Chemin de la base SQLite")
-    parser.add_argument("--no-dns", action="store_true", help="Désactiver l'analyse DNS")
-    parser.add_argument("--no-http", action="store_true", help="Désactiver l'analyse HTTP")
-    parser.add_argument("--no-tls", action="store_true", help="Désactiver l'analyse TLS")
-    parser.add_argument("--no-tech", action="store_true", help="Désactiver la détection de technologies")
-    parser.add_argument("--gui", action="store_true", help="Lancer l'interface graphique Tkinter")
-    return parser
+    <h2>TLS</h2>
+    <table>
+      <tr><th>Hôte</th><td>{{ result.tls.get('hostname', '') }}</td></tr>
+      <tr><th>Validation</th><td>{{ result.tls.get('certificate', {}).get('validation_status', 'unknown') }}</td></tr>
+      <tr><th>Certificat</th><td><pre>{{ result.tls.get('certificate', {}) | tojson(indent=2) }}</pre></td></tr>
+    </table>
 
+    <h2>Technologies</h2>
+    <h3>Confirmées</h3>
+    <ul>
+      {% for item in result.technologies.get('confirmed', []) %}
+        <li>{{ item.name }} ({{ item.source }}, {{ item.confidence }})</li>
+      {% endfor %}
+    </ul>
+    <h3>Supposées</h3>
+    <ul>
+      {% for item in result.technologies.get('suspected', []) %}
+        <li>{{ item.name }} ({{ item.source }}, {{ item.confidence }})</li>
+      {% endfor %}
+    </ul>
 
-def launch_gui() -> None:
-    import tkinter as tk
-    from tkinter import ttk
+    <h2>Recommandations</h2>
+    <ul>
+      {% for item in result.recommendations %}
+        <li>{{ item }}</li>
+      {% endfor %}
+    </ul>
 
-    root = tk.Tk()
-    root.title("WebScope Audit")
-    root.geometry("700x450")
-
-    frame = ttk.Frame(root, padding=12)
-    frame.pack(fill="both", expand=True)
-
-    ttk.Label(frame, text="Cible autorisée", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 8))
-    target_var = tk.StringVar(value="https://example.com")
-    ttk.Entry(frame, textvariable=target_var, width=60).grid(row=1, column=0, sticky="ew")
-
-    ttk.Label(frame, text="Dossier de sortie", font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky="w", pady=(12, 8))
-    folder_var = tk.StringVar(value="reports")
-    ttk.Entry(frame, textvariable=folder_var, width=60).grid(row=3, column=0, sticky="ew")
-
-    summary = tk.Text(frame, height=10, width=70)
-    summary.grid(row=4, column=0, sticky="nsew", pady=(12, 0))
-
-    def run_analysis() -> None:
-        config = AppConfig(
-            target_url=target_var.get(),
-            output_dir=folder_var.get(),
-            timeout=10.0,
-            max_redirects=5,
-            max_response_bytes=250000,
-            db_path=str(Path(folder_var.get()) / "webscope_audit.db"),
-        )
-        scanner = SiteScanner(config=config)
-        result = scanner.analyze(target_var.get())
-        html_path, json_path = write_report_files(result, folder_var.get())
-        summary.delete("1.0", tk.END)
-        summary.insert("end", f"Analyse terminée\nHTML: {html_path}\nJSON: {json_path}\n\n")
-        summary.insert("end", f"Cible: {result['target']}\n")
-        summary.insert("end", f"Statut HTTP: {result.get('http', {}).get('status')}")
-
-    ttk.Button(frame, text="Lancer l'analyse", command=run_analysis).grid(row=5, column=0, sticky="w", pady=(12, 0))
-    frame.columnconfigure(0, weight=1)
-    frame.rowconfigure(4, weight=1)
-    root.mainloop()
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = build_parser()
-    args = parser.parse_args(argv)
-
-    if args.gui:
-        launch_gui()
-        return 0
-
-    config = AppConfig(
-        target_url=args.target,
-        output_dir=args.output_dir,
-        timeout=args.timeout,
-        max_redirects=args.max_redirects,
-        db_path=args.db_path,
-        include_dns=not args.no_dns,
-        include_http=not args.no_http,
-        include_tls=not args.no_tls,
-        include_technologies=not args.no_tech,
-    )
-
-    scanner = SiteScanner(config=config)
-    result = scanner.analyze(args.target)
-    html_path, json_path = write_report_files(result, args.output_dir)
-    print(f"Analyse terminée. HTML: {html_path}\nJSON: {json_path}")
-    return 0
+    <h2>Limites</h2>
+    <pre>{{ result.limits | tojson(indent=2) }}</pre>
+  </body>
+</html>

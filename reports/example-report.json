@@ -1,14 +1,5 @@
-<!DOCTYPE html>
-<html lang="fr">
-  <head>
-    <meta charset="UTF-8" />
-    <title>WebScope Audit — Exemple fictif</title>
-  </head>
-  <body>
-    <h1>EXEMPLE FICTIF — WebScope Audit</h1>
-    <p>Ce rapport a été généré à titre d'exemple uniquement. Il ne correspond pas à un scan réel d'un site web public.</p>
-    <p>Cible : https://example.com</p>
-    <p>Périmètre : exemple public de démonstration</p>
-    <p>Statut : démonstration</p>
-  </body>
-</html>
+{
+  "status": "fictif",
+  "target": "https://example.com",
+  "note": "Ce fichier JSON est un exemple fictif et ne représente pas un résultat de scan réel."
+}

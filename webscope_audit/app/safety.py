@@ -16,14 +16,23 @@ def normalize_url(value: str) -> str:
     if split.scheme.lower() not in ALLOWED_SCHEMES:
         raise ValueError("Seules les URL HTTP et HTTPS sont acceptées.")
 
-    host = split.hostname or ""
-    if not host:
+    hostname = split.hostname or ""
+    if not hostname:
         raise ValueError("L'URL ne contient pas d'hôte valide.")
 
-    port = split.port or (443 if split.scheme.lower() == "https" else 80)
-    netloc = host if port in (80, 443) else f"{host}:{port}"
+    try:
+        ip = ipaddress.ip_address(hostname)
+    except ValueError:
+        ip = None
+
+    if ip is not None and (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved):
+        raise ValueError("L'URL cible ne doit pas pointer vers un hôte interne ou privé.")
+
+    netloc = hostname if split.port in (None, 80, 443) else f"{hostname}:{split.port}"
     normalized = urlunsplit((split.scheme.lower(), netloc, split.path or "/", split.query, split.fragment))
-    return normalized.rstrip("/") + ("/" if split.path == "" else "") if split.path == "" else normalized
+    if normalized.endswith("/") and split.path == "":
+        return normalized
+    return normalized.rstrip("/") if not split.path else normalized
 
 
 def validate_url(value: str) -> tuple[bool, str]:
@@ -39,20 +48,10 @@ def validate_url(value: str) -> tuple[bool, str]:
     if hostname in {"localhost", "127.0.0.1"}:
         return False, "La cible doit être un site public, pas un hôte local."
 
-    try:
-        ip = ipaddress.ip_address(hostname)
-    except ValueError:
-        ip = None
-
-    if ip is not None and (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved):
-        return False, "L'URL cible ne doit pas pointer vers un hôte interne ou privé."
-
     return True, url
 
 
 def validate_redirect_destination(current_url: str, redirect_url: str, seen_hosts: set[str]) -> bool:
-    from urllib.parse import urlsplit
-
     try:
         current = urlsplit(current_url)
         redirect = urlsplit(redirect_url)
@@ -62,12 +61,13 @@ def validate_redirect_destination(current_url: str, redirect_url: str, seen_host
     if redirect.scheme not in ALLOWED_SCHEMES:
         return False
 
-    current_host = (current.hostname or "").lower()
-    redirect_host = (redirect.hostname or "").lower()
-    if not redirect_host:
+    host = (redirect.hostname or "").lower()
+    if not host:
         return False
 
-    if current_host and redirect_host not in seen_hosts and redirect_host != current_host:
-        seen_hosts.add(redirect_host)
+    if current.hostname and current.hostname.lower() == host:
+        return True
 
+    if host not in seen_hosts:
+        seen_hosts.add(host)
     return True

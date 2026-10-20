@@ -1,48 +1,42 @@
 from __future__ import annotations
 
-import socket
-import ssl
-from datetime import datetime
 from typing import Any
 
+from bs4 import BeautifulSoup
 
-def analyze_tls(hostname: str, port: int = 443, timeout: float = 10.0) -> dict[str, Any]:
-    errors: list[str] = []
-    certificate: dict[str, Any] = {
-        "issuer": None,
-        "subject": None,
-        "dns_names": [],
-        "not_before": None,
-        "not_after": None,
-        "valid": False,
-        "validation_status": "unknown",
-    }
 
-    try:
-        context = ssl.create_default_context()
-        with socket.create_connection((hostname, port), timeout=timeout) as sock:
-            with context.wrap_socket(sock, server_hostname=hostname) as ssock:
-                peer_cert = ssock.getpeercert()
-                if peer_cert:
-                    certificate["issuer"] = peer_cert.get("issuer")
-                    certificate["subject"] = peer_cert.get("subject")
-                    certificate["dns_names"] = peer_cert.get("subjectAltName", [])
-                    certificate["dns_names"] = [item[1] for item in certificate["dns_names"] if item[0] == "DNS"]
-                    certificate["not_before"] = peer_cert.get("notBefore")
-                    certificate["not_after"] = peer_cert.get("notAfter")
-                    if certificate["not_before"] and certificate["not_after"]:
-                        certificate["valid"] = True
-                        certificate["validation_status"] = "valid"
-                else:
-                    certificate["validation_status"] = "no_certificate"
-    except Exception as exc:  # pragma: no cover - depends on runtime TLS environment
-        errors.append(str(exc))
-        certificate["validation_status"] = "error"
+def detect_technologies(headers: dict[str, Any], html_text: str) -> dict[str, list[dict[str, str]]]:
+    confirmed: list[dict[str, str]] = []
+    suspected: list[dict[str, str]] = []
 
-    return {
-        "hostname": hostname,
-        "port": port,
-        "certificate": certificate,
-        "errors": errors,
-        "collected_at": datetime.utcnow().isoformat() + "Z",
-    }
+    server = str(headers.get("server", "")).lower()
+    if "nginx" in server:
+        confirmed.append({"name": "nginx", "source": "header", "confidence": "confirmed"})
+    if "apache" in server:
+        confirmed.append({"name": "apache", "source": "header", "confidence": "confirmed"})
+
+    powered_by = str(headers.get("x-powered-by", "")).lower()
+    if powered_by:
+        confirmed.append({"name": powered_by, "source": "header", "confidence": "confirmed"})
+
+    for header_name in ("x-generator", "generator"):
+        value = headers.get(header_name)
+        if value:
+            confirmed.append({"name": str(value), "source": "header", "confidence": "confirmed"})
+
+    soup = BeautifulSoup(html_text or "", "html.parser")
+    if soup.find("script", src=True):
+        scripts = [str(script.get("src", "")).lower() for script in soup.find_all("script", src=True)]
+        for script in scripts:
+            if "jquery" in script:
+                confirmed.append({"name": "jquery", "source": "html", "confidence": "confirmed"})
+            if "bootstrap" in script:
+                confirmed.append({"name": "bootstrap", "source": "html", "confidence": "confirmed"})
+
+    generator_meta = soup.find("meta", attrs={"name": "generator"})
+    if generator_meta:
+        generator_value = str(generator_meta.get("content", "")).strip()
+        if generator_value:
+            suspected.append({"name": generator_value, "source": "html", "confidence": "suspected"})
+
+    return {"confirmed": confirmed, "suspected": suspected}

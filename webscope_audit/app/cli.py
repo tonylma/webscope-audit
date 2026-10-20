@@ -1,77 +1,94 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from urllib.parse import urlsplit
+import argparse
+from pathlib import Path
 
 from .config import AppConfig
-from .database import AuditDatabase
-from .dns_analyzer import analyze_dns
-from .http_analyzer import check_endpoint_availability, fetch_http_response
-from .safety import validate_url
-from .technology_detector import detect_technologies
-from .tls_analyzer import analyze_tls
+from .report_generator import write_report_files
+from .scanner import SiteScanner
 
 
-class SiteScanner:
-    def __init__(self, config: AppConfig | None = None, db_path: str | None = None):
-        self.config = config or AppConfig()
-        if db_path:
-            self.config.db_path = db_path
-        self.database = AuditDatabase(self.config.db_path)
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="WebScope Audit")
+    parser.add_argument("target", nargs="?", default="https://example.com", help="URL publique à analyser")
+    parser.add_argument("--output-dir", default="reports", help="Dossier de sortie pour les rapports")
+    parser.add_argument("--timeout", type=float, default=10.0, help="Délai d'attente en secondes")
+    parser.add_argument("--max-redirects", type=int, default=5, help="Nombre maximal de redirections")
+    parser.add_argument("--db-path", default="reports/webscope_audit.db", help="Chemin de la base SQLite")
+    parser.add_argument("--no-dns", action="store_true", help="Désactiver l'analyse DNS")
+    parser.add_argument("--no-http", action="store_true", help="Désactiver l'analyse HTTP")
+    parser.add_argument("--no-tls", action="store_true", help="Désactiver l'analyse TLS")
+    parser.add_argument("--no-tech", action="store_true", help="Désactiver la détection de technologies")
+    parser.add_argument("--gui", action="store_true", help="Lancer l'interface graphique Tkinter")
+    return parser
 
-    def analyze(self, target_url: str) -> dict:
-        ok, normalized = validate_url(target_url)
-        if not ok:
-            raise ValueError(normalized)
 
-        host = urlsplit(normalized).hostname or ""
-        results: dict = {
-            "target": normalized,
-            "collected_at": datetime.now(timezone.utc).isoformat(),
-            "scope": "public web analysis",
-            "dns": {},
-            "http": {},
-            "tls": {},
-            "technologies": {"confirmed": [], "suspected": []},
-            "errors": [],
-            "recommendations": [
-                "Limiter les redirections à une chaîne courte et vérifiable.",
-                "Ne pas contourner les mécanismes d'accès ou d'authentification.",
-                "Comparer les technologies détectées avec les en-têtes et le HTML publiquement visibles.",
-            ],
-            "limits": {
-                "max_redirects": self.config.max_redirects,
-                "timeout_seconds": self.config.timeout,
-                "max_response_bytes": self.config.max_response_bytes,
-                "max_requests": self.config.max_requests,
-            },
-            "metadata": {
-                "public_target": True,
-                "allowed_schemes": ["http", "https"],
-            },
-        }
+def launch_gui() -> None:
+    import tkinter as tk
+    from tkinter import ttk
 
-        if self.config.include_dns:
-            results["dns"] = analyze_dns(host)
+    root = tk.Tk()
+    root.title("WebScope Audit V2")
+    root.geometry("760x500")
 
-        if self.config.include_http:
-            http_result = fetch_http_response(normalized, self.config)
-            results["http"] = http_result
-            results["metadata"]["availability"] = check_endpoint_availability(host, self.config)
+    frame = ttk.Frame(root, padding=12)
+    frame.pack(fill="both", expand=True)
 
-        if self.config.include_tls:
-            results["tls"] = analyze_tls(host, timeout=self.config.timeout)
+    ttk.Label(frame, text="Cible autorisée", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w")
+    target_var = tk.StringVar(value="https://example.com")
+    ttk.Entry(frame, textvariable=target_var, width=70).grid(row=1, column=0, sticky="ew")
 
-        if self.config.include_technologies and results.get("http", {}).get("html"):
-            technology_result = detect_technologies(results["http"].get("headers", {}), results["http"].get("html", ""))
-            results["technologies"] = technology_result
+    ttk.Label(frame, text="Dossier de sortie", font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky="w", pady=(12, 0))
+    output_var = tk.StringVar(value="reports")
+    ttk.Entry(frame, textvariable=output_var, width=70).grid(row=3, column=0, sticky="ew")
 
-        if not results["dns"]:
-            results["errors"].append("Analyse DNS désactivée.")
-        if results["http"].get("error"):
-            results["errors"].append(f"HTTP: {results['http']['error']}")
-        if results["tls"].get("errors"):
-            results["errors"].append("TLS: vérification du certificat non conclue.")
+    summary = tk.Text(frame, height=12, width=80)
+    summary.grid(row=4, column=0, sticky="nsew", pady=(12, 0))
 
-        self.database.save_analysis(results)
-        return results
+    def run_analysis() -> None:
+        config = AppConfig(
+            target_url=target_var.get(),
+            output_dir=output_var.get(),
+            timeout=10.0,
+            max_redirects=5,
+            max_response_bytes=250000,
+        )
+        scanner = SiteScanner(config=config)
+        result = scanner.analyze(target_var.get())
+        html_path, json_path = write_report_files(result, output_var.get())
+        summary.delete("1.0", tk.END)
+        summary.insert("end", f"Analyse terminée\nHTML: {html_path}\nJSON: {json_path}\n\n")
+        summary.insert("end", f"Cible: {result['target']}\n")
+        summary.insert("end", f"Statut HTTP: {result.get('http', {}).get('status')}")
+
+    ttk.Button(frame, text="Lancer l'analyse", command=run_analysis).grid(row=5, column=0, sticky="w", pady=(12, 0))
+    frame.columnconfigure(0, weight=1)
+    frame.rowconfigure(4, weight=1)
+    root.mainloop()
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if args.gui:
+        launch_gui()
+        return 0
+
+    config = AppConfig(
+        target_url=args.target,
+        output_dir=args.output_dir,
+        timeout=args.timeout,
+        max_redirects=args.max_redirects,
+        db_path=args.db_path,
+        include_dns=not args.no_dns,
+        include_http=not args.no_http,
+        include_tls=not args.no_tls,
+        include_technologies=not args.no_tech,
+    )
+
+    scanner = SiteScanner(config=config)
+    result = scanner.analyze(args.target)
+    html_path, json_path = write_report_files(result, args.output_dir)
+    print(f"Analyse terminée. HTML: {html_path}\nJSON: {json_path}")
+    return 0

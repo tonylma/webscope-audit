@@ -1,24 +1,30 @@
-from webscope_audit.app.dns_analyzer import analyze_dns
-from webscope_audit.app.technology_detector import detect_technologies
+import pytest
+
+from webscope_audit.app.database import AuditDatabase
+from webscope_audit.app.report_generator import render_report_html
 
 
-class StubResolver:
-    def resolve(self, hostname, record_type):
-        if record_type == "A":
-            return ["93.184.216.34"]
-        raise Exception("No record")
+def test_database_save_and_history(tmp_path):
+    db_path = tmp_path / "audit.db"
+    database = AuditDatabase(db_path)
+    inserted = database.save_analysis({"target": "https://example.com", "collected_at": "2024-01-01", "scope": "test", "errors": []})
+    assert inserted > 0
+    history = database.list_history(5)
+    assert history[0]["target_url"] == "https://example.com"
 
 
-def test_analyze_dns_collects_records():
-    result = analyze_dns("example.com", resolver=StubResolver())
-    assert result["hostname"] == "example.com"
-    assert result["records"]["A"] == ["93.184.216.34"]
-
-
-def test_detect_technologies_from_headers_and_html():
-    headers = {"server": "nginx", "x-powered-by": "PHP"}
-    html = '<html><head><script src="/js/jquery.min.js"></script></head><body>Hello</body></html>'
-    result = detect_technologies(headers, html)
-    names = [item["name"] for item in result["confirmed"]]
-    assert "nginx" in names
-    assert "jquery" in names
+def test_report_html_renders_structure():
+    html = render_report_html({
+        "target": "https://example.com",
+        "collected_at": "2024-01-01",
+        "scope": "public web analysis",
+        "dns": {"hostname": "example.com", "records": {}, "errors": []},
+        "http": {"status": 200, "url": "https://example.com", "headers": {}, "final_url": "https://example.com"},
+        "tls": {"hostname": "example.com", "certificate": {"validation_status": "valid"}},
+        "technologies": {"confirmed": [], "suspected": []},
+        "recommendations": ["Valider les redirections"],
+        "errors": [],
+        "limits": {"max_redirects": 5},
+    })
+    assert "WebScope Audit V2" in html
+    assert "Valider les redirections" in html
