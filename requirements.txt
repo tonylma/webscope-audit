@@ -1,0 +1,96 @@
+# WebScope Audit
+
+WebScope Audit est un outil Python 3.11 de contrôle public d'un site web autorisé. Il collecte les éléments DNS, HTTP/HTTPS, TLS, détecte des technologies visibles publiquement et génère un rapport HTML et JSON.
+
+## Fonctionnalités V0.1
+
+- Validation et normalisation d'URL publique.
+- Contrôle des redirections et limitation des réponses.
+- Analyse DNS (A, AAAA, CNAME, MX, NS, TXT).
+- Analyse HTTP/HTTPS avec statut, headers et temps de réponse.
+- Analyse TLS avec extraction de certificat et validation.
+- Détection prudente de technologies à partir des headers et du HTML public.
+- Génération de rapport HTML et JSON.
+- Historique SQLite des analyses.
+- Interface CLI et interface graphique Tkinter.
+
+## Limites connues
+
+- Le module ne prétend pas scanner des zones internes, privées, captives ou non autorisées.
+- La détection de technologies est prudente et ne crée pas de version logicielle non confirmée.
+- La V0.1 couvre un périmètre public, sans exploration de ports, sous-domaines massifs, téléchargement de fichiers ou exploitation de vulnérabilités.
+
+## Installation sous Windows 10/11
+
+1. Installer Python 3.11 ou plus récent.
+2. Ouvrir PowerShell ou CMD dans le dossier du projet.
+3. Créer un environnement virtuel :
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+4. Installer les dépendances :
+
+```powershell
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+5. Lancer l'application :
+
+```powershell
+python main.py --gui
+```
+
+ou en ligne de commande :
+
+```powershell
+python main.py https://example.com --output-dir reports
+```
+
+## Utilisation
+
+### CLI
+
+```powershell
+python main.py https://example.com --output-dir reports
+python main.py https://example.com --no-dns --no-tls
+```
+
+### Interface graphique
+
+```powershell
+python main.py --gui
+```
+
+## Structure du projet
+
+```text
+webscope_audit/
+  app/
+  templates/
+  reports/
+  tests/
+main.py
+requirements.txt
+README.md
+```
+
+## Exécution des tests
+
+```powershell
+pytest -q
+```
+
+## Rapport fictif d'exemple
+
+Un exemple de rapport HTML et JSON est disponible dans le dossier `reports/` et est clairement identifié comme fictif si aucun scan réel n’a été effectué.
+
+## Sécurité
+
+- Validation des URL publiques uniquement.
+- Aucune désactivation de validation TLS.
+- Limitation des redirections, temps de réponse et volume de réponse.
+- Ne contournent aucun mécanisme d'accès ou d'authentification.
