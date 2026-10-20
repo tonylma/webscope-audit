@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     app_name: str = 'WebScope Audit'
     debug: bool = False
     environment: str = 'development'
+    database_url: str = 'postgresql+psycopg://webscope:webscope@localhost:5432/webscope'
+    redis_url: str = 'redis://localhost:6379/0'
     celery_broker_url: str = 'redis://localhost:6379/0'
     celery_result_backend: str = 'redis://localhost:6379/0'
     max_scan_depth: int = 2

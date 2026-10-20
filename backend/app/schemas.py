@@ -1,107 +1,48 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import List, Optional
 
-import dns.resolver
-import httpx
-from bs4 import BeautifulSoup
-
-COMMON_SUBDOMAINS = [
-    'www', 'api', 'admin', 'staging', 'dev', 'app', 'm', 'blog', 'cdn', 'ftp', 'mail', 'login', 'static', 'assets'
-]
-COMMON_PATHS = [
-    '/admin', '/login', '/api', '/v1', '/docs', '/swagger', '/graphql', '/robots.txt', '/sitemap.xml',
-    '/backup', '/uploads', '/config', '/settings', '/.git', '/.svn', '/.env', '/debug', '/private'
-]
+from pydantic import BaseModel, Field, HttpUrl
 
 
-def validate_url(url: str) -> Dict[str, Any]:
-    from urllib.parse import urlparse
-
-    parsed = urlparse(url)
-    if not parsed.scheme or not parsed.netloc:
-        raise ValueError('URL invalide')
-    if parsed.scheme not in {'http', 'https'}:
-        raise ValueError('Seules les URL HTTP/HTTPS sont acceptées')
-    return {
-        'scheme': parsed.scheme,
-        'host': parsed.netloc,
-        'hostname': parsed.hostname,
-        'path': parsed.path or '/',
-    }
+class ScanCreateRequest(BaseModel):
+    url: HttpUrl = Field(..., description='URL publique à analyser')
 
 
-def resolve_dns(hostname: str) -> List[Dict[str, str]]:
-    records: List[Dict[str, str]] = []
-    try:
-        answers = dns.resolver.resolve(hostname, 'A')
-        for rdata in answers:
-            records.append({'type': 'A', 'value': str(rdata)})
-    except Exception:
-        pass
-    return records
+class ScanResult(BaseModel):
+    id: int
+    target_url: str
+    status: str
+    risk_score: float = 0.0
+    summary: str = ''
 
 
-def discover_subdomains(base_domain: str) -> List[str]:
-    subdomains: List[str] = []
-    for prefix in COMMON_SUBDOMAINS:
-        candidate = f'{prefix}.{base_domain}'
-        try:
-            dns.resolver.resolve(candidate, 'A')
-            subdomains.append(candidate)
-        except Exception:
-            continue
-    return sorted(set(subdomains))
+class FindingItem(BaseModel):
+    category: str
+    title: str
+    severity: str
+    description: str = ''
+    evidence: str = ''
 
 
-def crawl_public_urls(base_url: str) -> List[str]:
-    from urllib.parse import urlparse
-
-    seen: set[str] = set()
-    urls: List[str] = []
-    try:
-        response = httpx.get(base_url, timeout=10, follow_redirects=True)
-        if response.status_code >= 400:
-            return urls
-        soup = BeautifulSoup(response.text, 'html.parser')
-        for tag in soup.find_all(['a', 'link', 'script', 'img', 'source']):
-            for attr in ('href', 'src', 'action', 'data-src', 'content'):
-                value = tag.get(attr)
-                if not value:
-                    continue
-                candidate = value
-                if candidate.startswith('/'):
-                    parsed = urlparse(base_url)
-                    candidate = f'{parsed.scheme}://{parsed.netloc}{candidate}'
-                if candidate.startswith('http') and candidate not in seen:
-                    seen.add(candidate)
-                    urls.append(candidate)
-    except Exception:
-        pass
-    return urls
+class SubdomainItem(BaseModel):
+    name: str
+    ip: Optional[str] = None
+    status: str = 'active'
 
 
-def build_scan_summary(target_url: str, subdomains: List[str], urls: List[str], findings: List[Dict[str, str]]) -> str:
-    risk = 'faible' if not findings else 'modéré'
-    return (
-        f'Analyse publique de {target_url}. '
-        f'{len(subdomains)} sous-domaines détectés, {len(urls)} URLs exposées, '
-        f'{len(findings)} signalements détectés. Niveau de risque global: {risk}.'
-    )
+class UrlItem(BaseModel):
+    url: str
+    source: str = 'crawl'
+    status_code: int = 200
+    depth: int = 1
 
 
-def download_public_file(url: str, max_bytes: int = 2_000_000) -> Dict[str, Any]:
-    try:
-        response = httpx.get(url, timeout=10, follow_redirects=True)
-        content = response.content
-        if len(content) > max_bytes:
-            return {'url': url, 'skipped': True, 'reason': 'size_limit'}
-        return {
-            'url': url,
-            'skipped': False,
-            'sha256': __import__('hashlib').sha256(content).hexdigest(),
-            'size_bytes': len(content),
-            'content_type': response.headers.get('content-type', 'unknown'),
-        }
-    except Exception:
-        return {'url': url, 'skipped': True, 'reason': 'request_failed'}
+class ScanReport(BaseModel):
+    scan_id: int
+    summary: str
+    risk_score: float
+    status: str = 'completed'
+    findings: List[FindingItem] = []
+    subdomains: List[SubdomainItem] = []
+    urls: List[UrlItem] = []

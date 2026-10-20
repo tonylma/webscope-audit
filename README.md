@@ -1,15 +1,13 @@
 # WebScope Audit Premium
 
-WebScope Audit est un outil de reconnaissance et d’audit de surface d’attaque publique, destiné à analyser un domaine ou une URL publique et à produire un rapport exploitable.
+WebScope Audit est une plateforme d’audit public de surface d’attaque et de reconnaissance web. Elle permet d’analyser un site ou un domaine public, d’extraire la surface exposée, détecter les sous-domaines, identifier les chemins visibles, et produire un rapport exploitable en HTML/JSON.
 
-## Stack
-
-- Backend: Python + FastAPI
-- Base de données: PostgreSQL
-- Caching/Broker: Redis
-- Workers: Celery
-- Frontend: React + TypeScript + Vite
-- Déploiement: Docker Compose
+Ce dépôt contient une version “one-click ready” orientée lancement local rapide via Docker Compose, avec :
+- backend FastAPI
+- workers Celery + Redis
+- PostgreSQL
+- frontend React + TypeScript
+- moteur de scan Python avec DNS, HTTP, TLS, sous-domaines, crawl et rapport
 
 ## Démarrage rapide
 
@@ -17,28 +15,52 @@ WebScope Audit est un outil de reconnaissance et d’audit de surface d’attaqu
 docker compose up --build
 ```
 
-## Services
+Puis ouvrez :
+- Frontend : http://localhost:5173
+- API : http://localhost:8000/docs
+- PostgreSQL : localhost:5432
+- Redis : localhost:6379
 
-- API Backend: http://localhost:8000
-- Frontend: http://localhost:5173
-- PostgreSQL: localhost:5432
-- Redis: localhost:6379
+## Fonctionnalités
 
-## Fonctionnalités MVP couvertes
+- validation et normalisation d’URL
+- résolution DNS et découverte de sous-domaines
+- analyse HTTP et redirections
+- détection de chemins publics sensibles
+- crawl HTML avec extraction d’URL
+- téléchargement contrôlé de fichiers publics
+- génération de résumés de risque
+- historique de scans
+- dashboard moderne
+- génération de rapport HTML/JSON
 
-- Validation d’URL et normalisation
-- Analyse DNS et découverte de sous-domaines
-- Analyse HTTP et redirections
-- Analyse TLS / certificat
-- Découverte d’URLs et crawl limité
-- Téléchargement public contrôlé
-- Génération de rapport HTML/JSON
-- Historique de scans
-- Dashboard professionnel
+## Stack
 
-## Sécurité
+- Python 3.11
+- FastAPI
+- Celery + Redis
+- PostgreSQL
+- React + TypeScript + Vite
+- Docker Compose
+- Nmap (via image backend)
 
-- Timeouts stricts
-- Limite de profondeur de crawl
-- Limite de fichiers et tailles
-- Analyse uniquement sur périmètre public et autorisé
+## Revue rapide de la structure
+
+- `backend/` : API, moteur de scan, services, tâches Celery
+- `frontend/` : interface utilisateur
+- `infra/postgres/` : script d’initialisation PostgreSQL
+- `docker-compose.yml` : orchestration complète
+
+## Sécurité et cadre légal
+
+- La plateforme est conçue pour l’audit public et autorisé.
+- Les scans sont limités par timeout, taille et profondeur.
+- Les requêtes ne doivent pas dépasser le périmètre de test autorisé.
+
+## Exemple de scan
+
+```bash
+curl -X POST http://localhost:8000/scan \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com"}'
+```

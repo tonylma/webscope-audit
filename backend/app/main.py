@@ -6,8 +6,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.schemas import ScanCreateRequest, ScanReport, ScanResult
+from app.services.report_service import generate_report_html, generate_report_json
 from app.services.scanner_service import analyze_target
-from app.tasks import scan_url_task
 
 app = FastAPI(title='WebScope Audit API', version='1.0.0', docs_url='/docs')
 
@@ -51,38 +51,6 @@ def create_scan(payload: ScanCreateRequest):
     )
 
 
-@app.post('/scan/async', response_model=ScanResult)
-def create_scan_async(payload: ScanCreateRequest):
-    try:
-        result = analyze_target(str(payload.url))
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    try:
-        job = scan_url_task.apply_async(args=[str(payload.url)])
-        result['scan_id'] = len(SCAN_STORE) + 1
-        result['job_id'] = job.id
-        SCAN_STORE[result['scan_id']] = result
-        return ScanResult(
-            id=result['scan_id'],
-            target_url=result['target_url'],
-            status='queued',
-            risk_score=result['risk_score'],
-            summary=result['summary'],
-        )
-    except Exception:
-        scan_id = len(SCAN_STORE) + 1
-        result['scan_id'] = scan_id
-        SCAN_STORE[scan_id] = result
-        return ScanResult(
-            id=scan_id,
-            target_url=result['target_url'],
-            status='completed',
-            risk_score=result['risk_score'],
-            summary=result['summary'],
-        )
-
-
 @app.get('/scan/{scan_id}', response_model=ScanResult)
 def get_scan(scan_id: int):
     result = SCAN_STORE.get(scan_id)
@@ -98,11 +66,35 @@ def get_scan(scan_id: int):
     )
 
 
+@app.get('/scan/{scan_id}/subdomains')
+def get_subdomains(scan_id: int):
+    result = SCAN_STORE.get(scan_id)
+    if not result:
+        raise HTTPException(status_code=404, detail='Scan introuvable')
+    return {'subdomains': result.get('subdomains', [])}
+
+
+@app.get('/scan/{scan_id}/urls')
+def get_urls(scan_id: int):
+    result = SCAN_STORE.get(scan_id)
+    if not result:
+        raise HTTPException(status_code=404, detail='Scan introuvable')
+    return {'urls': result.get('urls', [])}
+
+
+@app.get('/scan/{scan_id}/files')
+def get_files(scan_id: int):
+    result = SCAN_STORE.get(scan_id)
+    if not result:
+        raise HTTPException(status_code=404, detail='Scan introuvable')
+    return {'files': result.get('files', [])}
+
+
 @app.get('/scan/{scan_id}/report', response_model=ScanReport)
 def get_report(scan_id: int):
     result = SCAN_STORE.get(scan_id)
     if not result:
-        raise HTTPException(status_code=404, detail='Rapport introuvable')
+        raise HTTPException(status_code=404, detail='Scan introuvable')
 
     return ScanReport(
         scan_id=scan_id,
@@ -111,17 +103,28 @@ def get_report(scan_id: int):
         status='completed',
         findings=[
             {
-                'category': finding.get('category', 'general'),
-                'title': finding.get('title', 'Signalement'),
-                'severity': finding.get('severity', 'medium'),
-                'description': finding.get('description', ''),
-                'evidence': finding.get('evidence', ''),
+                'category': item.get('category', 'general'),
+                'title': item.get('title', 'Signalement'),
+                'severity': item.get('severity', 'medium'),
+                'description': item.get('description', ''),
+                'evidence': item.get('evidence', ''),
             }
-            for finding in result.get('findings', [])
+            for item in result.get('findings', [])
         ],
-        subdomains=[{'name': s, 'ip': None, 'status': 'active'} for s in result.get('subdomains', [])],
+        subdomains=[{'name': s, 'status': 'active'} for s in result.get('subdomains', [])],
         urls=[{'url': u, 'source': 'crawl', 'status_code': 200, 'depth': 1} for u in result.get('urls', [])],
     )
+
+
+@app.get('/reports/{scan_id}')
+def get_report_raw(scan_id: int):
+    result = SCAN_STORE.get(scan_id)
+    if not result:
+        raise HTTPException(status_code=404, detail='Scan introuvable')
+    return {
+        'html': generate_report_html(result),
+        'json': generate_report_json(result),
+    }
 
 
 @app.get('/history')

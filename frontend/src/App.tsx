@@ -1,74 +1,161 @@
-from __future__ import annotations
+import { useEffect, useMemo, useState } from 'react';
+import { createScan, getHistory, getReport } from './services/api';
+import type { HistoryItem, Report, ScanResult } from './types';
 
-from typing import Any, Dict, List
+function App() {
+  const [url, setUrl] = useState('https://example.com');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<ScanResult | null>(null);
+  const [report, setReport] = useState<Report | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
 
-import httpx
+  const loadHistory = async () => {
+    const data = await getHistory();
+    setHistory(data.scans);
+  };
 
-from app.schemas import (
-    build_scan_summary,
-    crawl_public_urls,
-    discover_subdomains,
-    resolve_dns,
-    validate_url,
-)
+  useEffect(() => {
+    void loadHistory();
+  }, []);
 
-
-def analyze_target(target_url: str) -> Dict[str, Any]:
-    validated = validate_url(target_url)
-    hostname = validated['hostname']
-
-    try:
-        response = httpx.get(target_url, timeout=10, follow_redirects=True)
-        status_code = response.status_code
-        headers = dict(response.headers)
-        final_url = str(response.url)
-    except Exception:
-        status_code = 0
-        headers = {}
-        final_url = target_url
-
-    dns_records = resolve_dns(hostname)
-    discovered_urls = crawl_public_urls(target_url)
-    subdomains = discover_subdomains(hostname)
-    filtered_urls = [u for u in discovered_urls if u not in {target_url, final_url}][:50]
-
-    findings: List[Dict[str, str]] = []
-    if status_code >= 400:
-        findings.append({
-            'category': 'http',
-            'title': 'Réponse HTTP problématique',
-            'severity': 'medium',
-            'description': 'Le site répond avec un code d’erreur important.',
-            'evidence': f'HTTP {status_code}',
-        })
-    if subdomains:
-        findings.append({
-            'category': 'subdomain',
-            'title': 'Sous-domaines exposés',
-            'severity': 'medium',
-            'description': 'Des sous-domaines visibles publiquement peuvent exposer des services internes.',
-            'evidence': ', '.join(subdomains[:5]),
-        })
-    if not dns_records:
-        findings.append({
-            'category': 'dns',
-            'title': 'Résolution DNS limitée',
-            'severity': 'low',
-            'description': 'Aucun enregistrement A n’a été résolu pour le domaine principal.',
-            'evidence': hostname,
-        })
-
-    summary = build_scan_summary(target_url, subdomains, filtered_urls, findings)
-    return {
-        'target_url': target_url,
-        'final_url': final_url,
-        'status_code': status_code,
-        'headers': headers,
-        'hostname': hostname,
-        'subdomains': subdomains,
-        'dns_records': dns_records,
-        'urls': filtered_urls,
-        'findings': findings,
-        'summary': summary,
-        'risk_score': max(15, 35 + min(len(subdomains) * 8, 45) + min(len(filtered_urls) * 2, 20)),
+  const runScan = async () => {
+    setLoading(true);
+    try {
+      const scan = await createScan(url);
+      setResult(scan);
+      const detailedReport = await getReport(scan.id);
+      setReport(detailedReport);
+      await loadHistory();
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const riskTone = useMemo(() => {
+    if (!result) return 'neutral';
+    if (result.risk_score >= 70) return 'critical';
+    if (result.risk_score >= 45) return 'warning';
+    return 'safe';
+  }, [result]);
+
+  return (
+    <div className="shell">
+      <header className="topbar">
+        <div>
+          <p className="eyebrow">WebScope Audit Premium</p>
+          <h1>Surface d’attaque publique</h1>
+        </div>
+        <span className={`status-pill ${riskTone}`}>
+          {result ? `Risque ${result.risk_score}` : 'Prêt'}
+        </span>
+      </header>
+
+      <section className="panel hero">
+        <div className="hero-copy">
+          <h2>Analyse rapide et structurée</h2>
+          <p>
+            Validez une URL, analysez la surface exposée, repérez les sous-domaines,
+            les chemins publics et les éléments vulnérables visibles.
+          </p>
+        </div>
+
+        <div className="scan-box">
+          <label htmlFor="target">URL cible</label>
+          <div className="scan-row">
+            <input id="target" value={url} onChange={(e) => setUrl(e.target.value)} />
+            <button onClick={runScan} disabled={loading}>
+              {loading ? 'Analyse...' : 'Lancer le scan'}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="stats-grid">
+        <article className="stat-card">
+          <span>URL ciblée</span>
+          <strong>{result?.target_url || '—'}</strong>
+        </article>
+        <article className="stat-card">
+          <span>Statut</span>
+          <strong>{result?.status || 'Idle'}</strong>
+        </article>
+        <article className="stat-card">
+          <span>Score</span>
+          <strong>{result?.risk_score ?? 0}</strong>
+        </article>
+      </section>
+
+      <section className="content-grid">
+        <div className="panel">
+          <h3>Résumé</h3>
+          <p className="summary-text">{result?.summary || 'Aucun scan lancé pour le moment.'}</p>
+        </div>
+
+        <div className="panel">
+          <h3>Découverte</h3>
+          <ul className="simple-list">
+            {report?.subdomains && report.subdomains.length > 0 ? (
+              report.subdomains.slice(0, 6).map((sub) => <li key={sub.name}>{sub.name}</li>)
+            ) : (
+              <li>Aucun sous-domaine détecté.</li>
+            )}
+          </ul>
+        </div>
+      </section>
+
+      <section className="panel">
+        <h3>Signalements</h3>
+        {report?.findings && report.findings.length > 0 ? (
+          <div className="findings-list">
+            {report.findings.map((finding, index) => (
+              <div key={`${finding.title}-${index}`} className="finding-item">
+                <div className="finding-head">
+                  <span className={`severity ${finding.severity}`}>{finding.severity}</span>
+                  <strong>{finding.title}</strong>
+                </div>
+                <p>{finding.description}</p>
+                <small>{finding.evidence}</small>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p>Aucun signalement notable.</p>
+        )}
+      </section>
+
+      <section className="panel">
+        <h3>URLs exposées</h3>
+        <div className="url-list">
+          {report?.urls && report.urls.length > 0 ? (
+            report.urls.slice(0, 12).map((item) => (
+              <a key={item.url} href={item.url} target="_blank" rel="noreferrer" className="url-item">
+                {item.url}
+              </a>
+            ))
+          ) : (
+            <p>Aucune URL exposée détectée.</p>
+          )}
+        </div>
+      </section>
+
+      <section className="panel">
+        <h3>Historique</h3>
+        <ul className="history-list">
+          {history.length === 0 ? (
+            <li>Le journal de scans est vide.</li>
+          ) : (
+            history.map((item) => (
+              <li key={item.id}>
+                <span>{item.target_url}</span>
+                <span className="chip">{item.status}</span>
+                <span>{item.risk_score}</span>
+              </li>
+            ))
+          )}
+        </ul>
+      </section>
+    </div>
+  );
+}
+
+export default App;
