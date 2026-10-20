@@ -44,10 +44,10 @@ services:
       dockerfile: Dockerfile
     container_name: webscope-frontend
     restart: unless-stopped
-    ports:
-      - '5173:5173'
     depends_on:
       - backend
+    ports:
+      - '5173:5173'
     volumes:
       - ./frontend:/app
       - /app/node_modules
