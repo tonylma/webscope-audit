@@ -1,14 +1,234 @@
-from __future__ import annotations
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ result.get('title', 'WebScope Audit V4') }}</title>
+    <style>
+      :root {
+        --bg: #f8fafc;
+        --card: #ffffff;
+        --navy: #0f172a;
+        --blue: #1d4ed8;
+        --teal: #0f766e;
+        --green: #166534;
+        --amber: #b45309;
+        --red: #991b1b;
+        --line: #dbeafe;
+        --muted: #475569;
+      }
+      body {
+        margin: 0;
+        background: linear-gradient(180deg, #eef6ff 0%, var(--bg) 100%);
+        color: var(--navy);
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      .container {
+        max-width: 1100px;
+        margin: 32px auto;
+        padding: 0 16px 40px;
+      }
+      .header {
+        background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%);
+        color: #fff;
+        border-radius: 18px;
+        padding: 28px 30px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.15);
+      }
+      .header h1 { margin: 0 0 12px; font-size: 2.2rem; }
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+        margin-top: 18px;
+      }
+      .meta-item {
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 10px;
+        padding: 12px 14px;
+      }
+      .meta-item strong { display: block; margin-bottom: 4px; color: #dbeafe; }
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+        margin-top: 24px;
+      }
+      .card {
+        background: var(--card);
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+        padding: 18px;
+      }
+      .badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-weight: bold;
+        font-size: 12px;
+      }
+      .ok { background: #dcfce7; color: var(--green); }
+      .warn { background: #fef3c7; color: var(--amber); }
+      .error { background: #fee2e2; color: var(--red); }
+      .muted { color: var(--muted); }
+      .section { margin-top: 28px; }
+      .section h2 {
+        color: var(--navy);
+        border-bottom: 3px solid #dbeafe;
+        padding-bottom: 10px;
+        margin-bottom: 12px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        background: var(--card);
+      }
+      th, td {
+        border: 1px solid var(--line);
+        padding: 10px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th { background: #eff6ff; color: var(--navy); }
+      pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin: 0;
+        font-size: 12px;
+      }
+      ul { margin: 8px 0 0 18px; }
+      li { margin-bottom: 6px; }
+      @media (max-width: 760px) {
+        .header h1 { font-size: 1.6rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>{{ result.get('title', 'WebScope Audit V4') }}</h1>
+        <div class="meta-grid">
+          <div class="meta-item"><strong>Cible</strong>{{ result.get('target', '') }}</div>
+          <div class="meta-item"><strong>Date</strong>{{ result.get('collected_at', '') }}</div>
+          <div class="meta-item"><strong>Périmètre</strong>{{ result.get('scope', '') }}</div>
+        </div>
+      </div>
 
-from typing import Any
+      <div class="summary-grid">
+        <div class="card">
+          <div class="badge ok">Suivi</div>
+          <h3>Risques</h3>
+          <p class="muted">Critiques : {{ result.get('summary', {}).get('risk_summary', {}).get('critical', 0) }} | Moyens : {{ result.get('summary', {}).get('risk_summary', {}).get('medium', 0) }}</p>
+        </div>
+        <div class="card">
+          <div class="badge warn">DNS</div>
+          <h3>Sous-domaines</h3>
+          <p class="muted">{{ len(result.get('subdomains', [])) }} détectés</p>
+        </div>
+        <div class="card">
+          <div class="badge error">Ports</div>
+          <h3>Ouverts</h3>
+          <p class="muted">{{ len(result.get('ports', {}).get('open', [])) }} port(s)</p>
+        </div>
+        <div class="card">
+          <div class="badge ok">Erreurs</div>
+          <h3>Signalement</h3>
+          <p class="muted">{{ len(result.get('errors', [])) }} erreur(s)</p>
+        </div>
+      </div>
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+      <div class="section">
+        <h2>Résumé</h2>
+        {% if result.get('errors') %}
+          <ul>
+            {% for error in result.get('errors', []) %}
+              <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="ok">Aucune erreur critique détectée dans le périmètre scanné.</p>
+        {% endif %}
+      </div>
 
+      <div class="section">
+        <h2>DNS</h2>
+        <table>
+          <tr><th>Hôte</th><td>{{ result.get('dns', {}).get('hostname', '') }}</td></tr>
+          <tr><th>Enregistrements</th><td><pre>{{ result.get('dns', {}).get('records', {}) | tojson(indent=2) }}</pre></td></tr>
+          <tr><th>Erreurs</th><td>{{ result.get('dns', {}).get('errors', []) | join(', ') }}</td></tr>
+        </table>
+      </div>
 
-def render_report_html(scan_result: dict[str, Any]) -> str:
-    env = Environment(
-        loader=FileSystemLoader("templates"),
-        autoescape=select_autoescape(["html", "xml"]),
-    )
-    template = env.get_template("report.html")
-    return template.render(result=scan_result)
+      <div class="section">
+        <h2>HTTP / HTTPS</h2>
+        <table>
+          <tr><th>URL</th><td>{{ result.get('http', {}).get('url', '') }}</td></tr>
+          <tr><th>Statut</th><td>{{ result.get('http', {}).get('status') }}</td></tr>
+          <tr><th>Final URL</th><td>{{ result.get('http', {}).get('final_url', '') }}</td></tr>
+          <tr><th>Serveur</th><td>{{ result.get('http', {}).get('server', '') }}</td></tr>
+          <tr><th>Temps de réponse</th><td>{{ result.get('http', {}).get('response_time_ms', 0) }} ms</td></tr>
+        </table>
+      </div>
+
+      <div class="section">
+        <h2>TLS</h2>
+        <table>
+          <tr><th>Hôte</th><td>{{ result.get('tls', {}).get('hostname', '') }}</td></tr>
+          <tr><th>Validation</th><td>{{ result.get('tls', {}).get('certificate', {}).get('validation_status', 'unknown') }}</td></tr>
+          <tr><th>Certificat</th><td><pre>{{ result.get('tls', {}).get('certificate', {}) | tojson(indent=2) }}</pre></td></tr>
+        </table>
+      </div>
+
+      <div class="section">
+        <h2>Ports ouverts</h2>
+        <pre>{{ result.get('ports', {}) | tojson(indent=2) }}</pre>
+      </div>
+
+      <div class="section">
+        <h2>Sous-domaines détectés</h2>
+        <ul>
+          {% for host in result.get('subdomains', []) %}
+            <li>{{ host }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="section">
+        <h2>Technologies</h2>
+        <h3>Confirmées</h3>
+        <ul>
+          {% for item in result.get('technologies', {}).get('confirmed', []) %}
+            <li>{{ item.name }} ({{ item.source }}, {{ item.confidence }})</li>
+          {% endfor %}
+        </ul>
+        <h3>Supposées</h3>
+        <ul>
+          {% for item in result.get('technologies', {}).get('suspected', []) %}
+            <li>{{ item.name }} ({{ item.source }}, {{ item.confidence }})</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="section">
+        <h2>Faits / observations</h2>
+        <ul>
+          {% for finding in result.get('findings', []) %}
+            <li><strong>{{ finding.get('title', '') }}</strong> - {{ finding.get('description', '') }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="section">
+        <h2>Recommandations</h2>
+        <ul>
+          {% for item in result.get('recommendations', []) %}
+            <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </body>
+</html>

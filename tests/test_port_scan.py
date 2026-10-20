@@ -1,31 +1,21 @@
-from webscope_audit.app.database import AuditDatabase
-from webscope_audit.app.report_generator import render_report_html
+from webscope_audit.app.port_scanner import scan_ports
 
 
-def test_database_save_and_history(tmp_path):
-    db_path = tmp_path / "audit.db"
-    database = AuditDatabase(db_path)
-    inserted = database.save_analysis({"target": "https://example.com", "collected_at": "2024-01-01", "scope": "test", "errors": []})
-    assert inserted > 0
-    history = database.list_history(5)
-    assert history[0]["target_url"] == "https://example.com"
+def test_scan_ports_detects_open_port(monkeypatch):
+    def fake_create_connection(address, timeout):
+        class FakeSocket:
+            def __enter__(self):
+                return self
 
+            def __exit__(self, exc_type, exc, tb):
+                return False
 
-def test_report_html_renders_structure():
-    html = render_report_html({
-        "target": "https://example.com",
-        "collected_at": "2024-01-01",
-        "scope": "public web analysis",
-        "title": "WebScope Audit V3",
-        "dns": {"hostname": "example.com", "records": {}, "errors": []},
-        "http": {"status": 200, "url": "https://example.com", "headers": {}, "final_url": "https://example.com"},
-        "tls": {"hostname": "example.com", "certificate": {"validation_status": "valid"}},
-        "technologies": {"confirmed": [], "suspected": []},
-        "recommendations": ["Valider les redirections"],
-        "errors": [],
-        "limits": {"max_redirects": 5},
-        "subdomains": ["www.example.com"],
-        "ports": {"checked": [80, 443], "open": [80]},
-    })
-    assert "WebScope Audit V3" in html
-    assert "Valider les redirections" in html
+        if address[1] in {80, 443}:
+            return FakeSocket()
+        raise OSError("closed")
+
+    monkeypatch.setattr("socket.create_connection", fake_create_connection)
+    result = scan_ports("example.com", ports=[80, 443, 8443], timeout=1.0)
+    assert 80 in result["open"]
+    assert 443 in result["open"]
+    assert 8443 not in result["open"]
