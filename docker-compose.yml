@@ -1,0 +1,56 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: webscope-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: webscope
+      POSTGRES_USER: webscope
+      POSTGRES_PASSWORD: webscope
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  redis:
+    image: redis:7-alpine
+    container_name: webscope-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: webscope-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env.example
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - '8000:8000'
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: webscope-frontend
+    restart: unless-stopped
+    ports:
+      - '5173:5173'
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:

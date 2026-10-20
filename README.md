@@ -1,50 +1,75 @@
-# WebScope Audit V5
+# WebScope Audit Premium
 
-WebScope Audit V5 est une version plus professionnelle d'un outil Python 3.11 pour l'analyse publique d'un site web autorisé, conçu pour produire des rapports structurés, lisibles et exploitables pour une remise client, un partenaire ou une présentation investisseur.
+WebScope Audit est une plateforme d'analyse technique, de sécurité et de découverte de surface d'attaque d'un domaine ou d'une URL publique. Le projet vise à fournir une vue fiable de l'exposition technique d'un site en combinant validation URL, DNS, HTTP, TLS, redirections, sous-domaines, crawling, services exposés, fichiers publics et génération de rapport HTML/JSON.
 
-## Objectif de la V5
+## Stack technique
 
-- Produire un rapport d'audit public de qualité professionnelle.
-- Rendre la synthèse exploitable à partir d'un score global, d'un tableau de risques et d'une priorisation claire des recommandations.
-- Améliorer le rendu visuel et la lisibilité des exports HTML, Word et PDF.
-- Maintenir un cadre légal, éthique et public : périmètre ouvert et autorisé uniquement.
+- Backend: Python 3.11 + FastAPI
+- Base de données: PostgreSQL
+- Cache / broker: Redis
+- Workers: Celery
+- Frontend: React + TypeScript + Vite
+- Analyse réseau: Python + nmap
+- Rapports: HTML et JSON
+- Déploiement: Docker / Docker Compose
 
-## Fonctionnalités renforcées
+## Architecture
 
-- Analyse publique stricte des URL, redirections, DNS, HTTP, TLS, technologies, ports et sous-domaines.
-- Score global synthétique.
-- Tableau de risque détaillé par niveau.
-- Recommandations hiérarchisées par priorité.
-- Présentation HTML modernisée et plus professionnelle.
-- Export Word et PDF adaptés à une remise client.
-- Documentation de projet plus claire et plus orientée produit.
+- `backend/`: API FastAPI, worker Celery, moteur de scan, modèles de données
+- `frontend/`: dashboard React/TypeScript
+- `infra/`: utilitaires d'infrastructure et scripts de déploiement
+- `docs/`: architecture, API et documentation produit
+- `reports/`: exports de rapports générés
 
-## Installation
+## Fonctionnalités MVP
 
-```powershell
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+- Validation et normalisation d'URL
+- Résolution DNS et collecte d'informations de connectivité
+- Analyse HTTP et détection de redirections
+- Validation TLS / certificat
+- Découverte de sous-domaines
+- Discovery d'URL et crawl de pages publiques
+- Téléchargement limité de fichiers publics
+- Génération de rapports HTML et JSON
+- Historique de scans
+- API REST et dashboard moderne
+
+## Démarrage rapide
+
+```bash
+docker compose up --build
 ```
 
-## Utilisation
+Accès:
 
-```powershell
-python main.py https://example.com --output-dir reports
-python main.py https://example.com --output-dir reports --no-docx --no-pdf
+- API: http://localhost:8000
+- Frontend: http://localhost:5173
+- PostgreSQL: localhost:5432
+- Redis: localhost:6379
+
+## Commandes dev
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## Sorties produites
-
-- HTML : rapport visuellement structuré et prêt à l'usage.
-- JSON : données d'analyse exposées en structure exploitable.
-- DOCX : document Word pour une remise client ou une synthèse métier.
-- PDF : export plus lisible pour la diffusion externe.
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
 ## Sécurité et cadre légal
 
-- Analyse limitée aux services publics et autorisés.
-- Validation stricte des cibles et des redirections.
-- Aucune exploitation ni contournement de mécanismes de sécurité.
-- Limitation du périmètre et du volume de données collectées.
+- Limiter les analyses aux domaines publics et autorisés.
+- Respecter les timeouts et la limite de profondeur de crawl.
+- Contrôler les tailles des fichiers téléchargés.
+- Ne pas explorer plus que nécessaire.
+
+## Auteurs
+
+Projet conçu pour l'audit public de surface d'attaque et la reconnaissance technique légitime.

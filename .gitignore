@@ -1,6 +1,22 @@
-{
-  "status": "fictif",
-  "target": "https://example.com",
-  "note": "Ce fichier JSON est un exemple fictif et ne représente pas un résultat réel de scan."
-}
+# WebScope Audit Premium
 
+WebScope Audit est un projet conçu pour analyser les surfaces d'attaque publiques d'un site ou d'un domaine, en observant DNS, HTTP, TLS, sous-domaines, endpoints exposés, fichiers accessibles et services réseau.
+
+- Backend: FastAPI
+- Frontend: React + TypeScript
+- Workers: Celery
+- Storage: PostgreSQL
+- Cache/Broker: Redis
+- Deployment: Docker Compose
+
+## Caractéristiques principales
+
+- Validation et normalisation des URLs cibles
+- Analyse DNS et découverte de sous-domaines
+- Analyse HTTP avec redirections et headers
+- Analyse TLS / certificat
+- Découverte de liens, endpoints et routes
+- Téléchargement contrôlé de fichiers publics
+- Rapport HTML et JSON
+- Historique de scans
+- Dashboard professionnel
