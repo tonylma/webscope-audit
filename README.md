@@ -2,7 +2,7 @@
 
 WebScope Audit est une plateforme d’audit public de surface d’attaque et de reconnaissance web. Elle permet d’analyser un site ou un domaine public, d’extraire la surface exposée, détecter les sous-domaines, identifier les chemins visibles, et produire un rapport exploitable en HTML/JSON.
 
-Ce dépôt contient une version “one-click ready” orientée lancement local rapide via Docker Compose, avec :
+Ce dépôt contient la version finale de production du projet, organisée autour de :
 - backend FastAPI
 - workers Celery + Redis
 - PostgreSQL
@@ -44,12 +44,13 @@ Puis ouvrez :
 - Docker Compose
 - Nmap (via image backend)
 
-## Revue rapide de la structure
+## Structure du projet final
 
-- `backend/` : API, moteur de scan, services, tâches Celery
+- `backend/` : API, moteur de scan et services métier
 - `frontend/` : interface utilisateur
 - `infra/postgres/` : script d’initialisation PostgreSQL
-- `docker-compose.yml` : orchestration complète
+- `docker-compose.yml` : orchestration locale
+- `Makefile` : commandes de lancement
 
 ## Sécurité et cadre légal
 
