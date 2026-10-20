@@ -1,4 +1,5 @@
-from .app.config import AppConfig
-from .app.scanner import SiteScanner
+__version__ = "3.0.0"
 
-__all__ = ["AppConfig", "SiteScanner"]
+from .app.config import AppConfig
+
+__all__ = ["AppConfig", "__version__"]

@@ -26,15 +26,14 @@ def analyze_tls(hostname: str, port: int = 443, timeout: float = 10.0) -> dict[s
                 if cert:
                     certificate["issuer"] = cert.get("issuer")
                     certificate["subject"] = cert.get("subject")
-                    dns_names = cert.get("subjectAltName", [])
-                    certificate["dns_names"] = [value for key, value in dns_names if key == "DNS"]
+                    certificate["dns_names"] = [name for key, name in cert.get("subjectAltName", []) if key == "DNS"]
                     certificate["not_before"] = cert.get("notBefore")
                     certificate["not_after"] = cert.get("notAfter")
                     certificate["valid"] = True
                     certificate["validation_status"] = "valid"
                 else:
                     certificate["validation_status"] = "no_certificate"
-    except Exception as exc:  # pragma: no cover - depends on TLS availability
+    except Exception as exc:  # pragma: no cover - environment-dependent
         errors.append(str(exc))
         certificate["validation_status"] = "error"
 

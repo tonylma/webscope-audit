@@ -1,89 +1,109 @@
-# WebScope Audit V2
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>{{ result.get('title', 'WebScope Audit V3') }}</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 2rem; color: #1f2937; }
+      h1, h2, h3 { color: #0f172a; }
+      .meta { background: #f8fafc; border: 1px solid #dbeafe; border-radius: 8px; padding: 1rem; }
+      .panel { margin-top: 1.5rem; }
+      table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+      th, td { border: 1px solid #d1d5db; padding: 0.6rem; text-align: left; vertical-align: top; }
+      .ok { color: #166534; font-weight: bold; }
+      .warn { color: #92400e; font-weight: bold; }
+      .error { color: #991b1b; font-weight: bold; }
+      pre { white-space: pre-wrap; }
+      ul { margin-top: 0.5rem; }
+    </style>
+  </head>
+  <body>
+    <h1>{{ result.get('title', 'WebScope Audit V3') }}</h1>
+    <div class="meta">
+      <p><strong>Cible :</strong> {{ result.get('target', '') }}</p>
+      <p><strong>Date :</strong> {{ result.get('collected_at', '') }}</p>
+      <p><strong>Périmètre :</strong> {{ result.get('scope', '') }}</p>
+    </div>
 
-WebScope Audit V2 est une version améliorée d'un outil Python 3.11 de contrôle public d'un site web autorisé. Il collecte les informations DNS, HTTP/HTTPS, TLS, détecte les technologies publiquement visibles et génère un rapport HTML et JSON exploitable.
+    <div class="panel">
+      <h2>Résumé</h2>
+      {% if result.get('errors') %}
+        <ul>
+          {% for error in result.get('errors', []) %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="ok">Aucune erreur critique détectée dans le périmètre scanné.</p>
+      {% endif %}
+    </div>
 
-## Fonctionnalités V2
+    <div class="panel">
+      <h2>DNS</h2>
+      <table>
+        <tr><th>Hôte</th><td>{{ result.get('dns', {}).get('hostname', '') }}</td></tr>
+        <tr><th>Enregistrements</th><td><pre>{{ result.get('dns', {}).get('records', {}) | tojson(indent=2) }}</pre></td></tr>
+        <tr><th>Erreurs</th><td>{{ result.get('dns', {}).get('errors', []) | join(', ') }}</td></tr>
+      </table>
+    </div>
 
-- Validation stricte des URL publiques.
-- Normalisation des cibles et contrôle des redirections.
-- Analyse DNS : A, AAAA, CNAME, MX, NS, TXT.
-- Analyse HTTP/HTTPS : statut, headers, final URL, redirections, temps de réponse.
-- Analyse TLS : subject, issuer, SAN, validité, erreurs de connexion.
-- Détection prudente des technologies via headers et HTML public.
-- Rapport HTML structuré et export JSON.
-- Historique SQLite des analyses.
-- Interface CLI et interface graphique Tkinter.
+    <div class="panel">
+      <h2>HTTP / HTTPS</h2>
+      <table>
+        <tr><th>URL</th><td>{{ result.get('http', {}).get('url', '') }}</td></tr>
+        <tr><th>Statut</th><td>{{ result.get('http', {}).get('status') }}</td></tr>
+        <tr><th>Final URL</th><td>{{ result.get('http', {}).get('final_url', '') }}</td></tr>
+        <tr><th>Serveur</th><td>{{ result.get('http', {}).get('server', '') }}</td></tr>
+        <tr><th>Temps de réponse</th><td>{{ result.get('http', {}).get('response_time_ms', 0) }} ms</td></tr>
+      </table>
+    </div>
 
-## Limites connues
+    <div class="panel">
+      <h2>TLS</h2>
+      <table>
+        <tr><th>Hôte</th><td>{{ result.get('tls', {}).get('hostname', '') }}</td></tr>
+        <tr><th>Validation</th><td>{{ result.get('tls', {}).get('certificate', {}).get('validation_status', 'unknown') }}</td></tr>
+        <tr><th>Certificat</th><td><pre>{{ result.get('tls', {}).get('certificate', {}) | tojson(indent=2) }}</pre></td></tr>
+      </table>
+    </div>
 
-- Le périmètre est limité à un site public autorisé.
-- La V2 ne couvre pas les sous-domaines massifs, les ports non web, les téléchargements massifs, ni les tentatives d'exploitation.
-- Les technologies sont détectées uniquement à partir de données publiques et sans inventer de version logicielle.
-- Aucune désactivation de validation TLS n'est effectuée.
+    <div class="panel">
+      <h2>Ports</h2>
+      <pre>{{ result.get('ports', {}) | tojson(indent=2) }}</pre>
+    </div>
 
-## Installation sous Windows 10/11
+    <div class="panel">
+      <h2>Sous-domaines</h2>
+      <ul>
+        {% for host in result.get('subdomains', []) %}
+          <li>{{ host }}</li>
+        {% endfor %}
+      </ul>
+    </div>
 
-1. Installer Python 3.11 ou plus récent.
-2. Ouvrir PowerShell dans le dossier du projet.
-3. Créer un environnement virtuel :
+    <div class="panel">
+      <h2>Technologies</h2>
+      <h3>Confirmées</h3>
+      <ul>
+        {% for item in result.get('technologies', {}).get('confirmed', []) %}
+          <li>{{ item.name }} ({{ item.source }}, {{ item.confidence }})</li>
+        {% endfor %}
+      </ul>
+      <h3>Supposées</h3>
+      <ul>
+        {% for item in result.get('technologies', {}).get('suspected', []) %}
+          <li>{{ item.name }} ({{ item.source }}, {{ item.confidence }})</li>
+        {% endfor %}
+      </ul>
+    </div>
 
-```powershell
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
-
-4. Installer les dépendances :
-
-```powershell
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
-
-5. Lancer l'application :
-
-```powershell
-python main.py --gui
-```
-
-ou :
-
-```powershell
-python main.py https://example.com --output-dir reports
-```
-
-## Utilisation
-
-```powershell
-python main.py https://example.com --output-dir reports
-python main.py https://example.com --no-dns --no-tls
-```
-
-## Structure du projet
-
-```text
-webscope_audit/
-  app/
-  templates/
-  reports/
-  tests/
-main.py
-requirements.txt
-README.md
-```
-
-## Exécution des tests
-
-```powershell
-pytest -q
-```
-
-## Rapport d'exemple
-
-Un fichier HTML et JSON est fourni dans le dossier `reports/` comme exemple fictif. Il est clair que ce n'est pas un scan réel.
-
-## Sécurité
-
-- Validation de la cible publique uniquement.
-- Redirections limitées et contrôlées.
-- Interdiction de contourner l'authentification ou les mécanismes de sécurité.
-- Validation TLS non désactivée.
+    <div class="panel">
+      <h2>Recommandations</h2>
+      <ul>
+        {% for item in result.get('recommendations', []) %}
+          <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </body>
+</html>

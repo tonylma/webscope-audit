@@ -6,10 +6,13 @@ from urllib.parse import urlsplit
 from .config import AppConfig
 from .database import AuditDatabase
 from .dns_analyzer import analyze_dns
-from .http_analyzer import check_endpoint_availability, fetch_http_response
+from .http_analyzer import check_endpoint_availability, fetch_http_response, has_open_port
+from .port_scanner import scan_ports
 from .safety import validate_url
+from .subdomain_discovery import discover_subdomains
 from .technology_detector import detect_technologies
 from .tls_analyzer import analyze_tls
+from .crawler import crawl_public_pages
 
 
 class SiteScanner:
@@ -33,6 +36,10 @@ class SiteScanner:
             "http": {},
             "tls": {},
             "technologies": {"confirmed": [], "suspected": []},
+            "subdomains": [],
+            "ports": {"checked": [], "open": []},
+            "crawl": {"visited": [], "pages": 0},
+            "findings": [],
             "errors": [],
             "recommendations": [
                 "Limiter les redirections à une chaîne courte et vérifiable.",
@@ -44,6 +51,8 @@ class SiteScanner:
                 "timeout_seconds": self.config.timeout,
                 "max_response_bytes": self.config.max_response_bytes,
                 "max_requests": self.config.max_requests,
+                "max_pages": self.config.max_pages,
+                "max_subdomains": self.config.max_subdomains,
             },
             "metadata": {
                 "public_target": True,
@@ -52,11 +61,18 @@ class SiteScanner:
         }
 
         if self.config.include_dns:
-            results["dns"] = analyze_dns(hostname)
+            results["dns"] = __import__("webscope_audit.app.dns_analyzer", fromlist=["analyze_dns"]).analyze_dns(hostname)
+            if self.config.enable_subdomain_scan:
+                results["subdomains"] = discover_subdomains(hostname, limit=self.config.max_subdomains)
 
         if self.config.include_http:
             results["http"] = fetch_http_response(normalized, self.config)
             results["metadata"]["availability"] = check_endpoint_availability(hostname, self.config)
+            if self.config.enable_crawl:
+                results["crawl"] = crawl_public_pages(normalized, max_pages=self.config.max_pages, timeout=self.config.timeout)
+
+        if self.config.enable_port_scan:
+            results["ports"] = scan_ports(hostname, ports=self.config.allowed_ports, timeout=max(1.0, min(2.5, self.config.timeout / 4)))
 
         if self.config.include_tls:
             results["tls"] = analyze_tls(hostname, timeout=self.config.timeout)
@@ -67,6 +83,30 @@ class SiteScanner:
                 results["http"].get("html", ""),
             )
             results["technologies"] = technology_result
+
+        if results["subdomains"]:
+            results["findings"].append(
+                {
+                    "status": "info",
+                    "level": "info",
+                    "title": "Sous-domaines détectés",
+                    "description": "Des sous-domaines potentiels ont été détectés pour la cible.",
+                    "confidence": "medium",
+                    "details": {"count": len(results["subdomains"]), "items": results["subdomains"][0:10]},
+                }
+            )
+
+        if results["ports"].get("open"):
+            results["findings"].append(
+                {
+                    "status": "warning",
+                    "level": "medium",
+                    "title": "Ports ouverts détectés",
+                    "description": "Des services exposés ont été trouvés sur des ports standards.",
+                    "confidence": "medium",
+                    "details": {"ports": results["ports"]["open"]},
+                }
+            )
 
         if not results["dns"]:
             results["errors"].append("Analyse DNS désactivée.")

@@ -1,5 +1,7 @@
-from urllib.parse import urlsplit, urlunsplit
+from __future__ import annotations
+
 import ipaddress
+from urllib.parse import urlsplit, urlunsplit
 
 ALLOWED_SCHEMES = {"http", "https"}
 
@@ -22,17 +24,16 @@ def normalize_url(value: str) -> str:
 
     try:
         ip = ipaddress.ip_address(hostname)
-    except ValueError:
-        ip = None
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+            raise ValueError("L'URL cible ne doit pas pointer vers un hôte interne ou privé.")
+    except ValueError as exc:
+        if str(exc) == "" or "is not a valid" not in str(exc):
+            raise
 
-    if ip is not None and (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved):
-        raise ValueError("L'URL cible ne doit pas pointer vers un hôte interne ou privé.")
-
-    netloc = hostname if split.port in (None, 80, 443) else f"{hostname}:{split.port}"
+    port = split.port
+    netloc = hostname if port in (None, 80, 443) else f"{hostname}:{port}"
     normalized = urlunsplit((split.scheme.lower(), netloc, split.path or "/", split.query, split.fragment))
-    if normalized.endswith("/") and split.path == "":
-        return normalized
-    return normalized.rstrip("/") if not split.path else normalized
+    return normalized.rstrip("/") if split.path else normalized
 
 
 def validate_url(value: str) -> tuple[bool, str]:
@@ -68,6 +69,13 @@ def validate_redirect_destination(current_url: str, redirect_url: str, seen_host
     if current.hostname and current.hostname.lower() == host:
         return True
 
-    if host not in seen_hosts:
-        seen_hosts.add(host)
+    seen_hosts.add(host)
     return True
+
+
+def is_public_hostname(hostname: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(hostname)
+        return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved)
+    except ValueError:
+        return True

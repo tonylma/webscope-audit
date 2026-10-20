@@ -1,5 +1,13 @@
-{
-  "status": "fictif",
-  "target": "https://example.com",
-  "note": "Ce fichier JSON est un exemple fictif et ne représente pas un résultat de scan réel."
-}
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>WebScope Audit V3 — Exemple fictif</title>
+  </head>
+  <body>
+    <h1>EXEMPLE FICTIF — WebScope Audit V3</h1>
+    <p>Ce document est un exemple fictif de rapport. Il ne correspond pas à un scan réel.</p>
+    <p>Cible : https://example.com</p>
+    <p>Périmètre : démonstration publique</p>
+  </body>
+</html>

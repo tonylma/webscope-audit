@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import socket
 from typing import Any
 
 import httpx
@@ -10,7 +10,7 @@ from .safety import validate_redirect_destination
 
 
 def fetch_http_response(url: str, config: AppConfig) -> dict[str, Any]:
-    headers = {"User-Agent": "WebScopeAudit/2.0"}
+    headers = {"User-Agent": "WebScopeAudit/3.0"}
     redirects: list[dict[str, Any]] = []
     seen_hosts: set[str] = set()
     current_url = url
@@ -54,7 +54,6 @@ def fetch_http_response(url: str, config: AppConfig) -> dict[str, Any]:
             "html": "",
         }
 
-    html = response.text[: config.max_response_bytes]
     return {
         "url": url,
         "status": response.status_code,
@@ -65,8 +64,8 @@ def fetch_http_response(url: str, config: AppConfig) -> dict[str, Any]:
         "error": error,
         "response_time_ms": round(response.elapsed.total_seconds() * 1000, 2) if response.elapsed else 0,
         "available": response.status_code < 500,
-        "html": html,
-        "collected_at": datetime.now(timezone.utc).isoformat(),
+        "html": response.text[: config.max_response_bytes],
+        "collected_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
     }
 
 
@@ -78,10 +77,18 @@ def check_endpoint_availability(hostname: str, config: AppConfig) -> dict[str, b
             response = httpx.get(
                 url,
                 follow_redirects=False,
-                headers={"User-Agent": "WebScopeAudit/2.0"},
+                headers={"User-Agent": "WebScopeAudit/3.0"},
                 timeout=config.timeout,
             )
             results[scheme] = response.status_code < 500
         except httpx.HTTPError:
             results[scheme] = False
     return results
+
+
+def has_open_port(hostname: str, port: int, timeout: float = 2.0) -> bool:
+    try:
+        with socket.create_connection((hostname, port), timeout=timeout):
+            return True
+    except OSError:
+        return False

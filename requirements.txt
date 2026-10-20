@@ -1,5 +1,69 @@
-httpx==0.27.1
-dnspython==2.6.1
-beautifulsoup4==4.12.3
-Jinja2==3.1.4
-pytest==8.3.3
+# WebScope Audit V3
+
+WebScope Audit V3 est une version renforcée d'un outil Python 3.11 destiné à analyser publiquement un site web autorisé et à produire un rapport HTML/JSON structuré.
+
+## Ce qui a été renforcé en V3
+
+- Validation plus stricte des URL publiques et des redirections.
+- Analyse DNS complète avec collecte des enregistrements A, AAAA, CNAME, MX, NS et TXT.
+- Découverte de sous-domaines prudente à partir d'un ensemble de noms globaux courants.
+- Scan de ports courants (80, 443, 8080, 8443, etc.) avec détection d'ouverture.
+- Exploration légère des pages du site public avec limite volontaire et contrôle de profondeur.
+- Détection des technologies à partir des en-têtes HTTP et du HTML public.
+- Génération de rapports HTML et JSON détaillés.
+- Historique SQLite des analyses.
+- Interface CLI et interface graphique Tkinter basique.
+
+## Limites connues
+
+- Cette version reste limitée à un périmètre public et autorisé, sans scanner de sous-domaines massifs ou de zones internes.
+- Le navigateur de pages est volontairement faible et ne parcourt pas automatiquement des dizaines de milliers de liens.
+- La V3 ne tente pas d'exploiter des vulnérabilités ni de contourner des mécanismes de sécurité.
+- Les valeurs détectées sont uniquement dérivées de données publiques et de signatures non inventées.
+
+## Installation sous Windows 10/11
+
+1. Installer Python 3.11 ou plus récent.
+2. Ouvrir PowerShell dans le dossier du projet.
+3. Créer un environnement virtuel :
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+4. Installer les dépendances :
+
+```powershell
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+5. Lancer l'application :
+
+```powershell
+python main.py --gui
+```
+
+ou :
+
+```powershell
+python main.py https://example.com --output-dir reports
+```
+
+## Exécution des tests
+
+```powershell
+pytest -q
+```
+
+## Exemple de rapport
+
+Un exemple de rapport fictif est disponible dans `reports/` et est clairement identifié comme non réel.
+
+## Sécurité
+
+- Validation des URL publiques uniquement.
+- Aucune désactivation de validation TLS.
+- Limitation des redirections, du volume de réponse et du nombre de requêtes.
+- Respect des mécanismes d'authentification et de sécurité applicatifs.

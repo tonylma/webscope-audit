@@ -19,23 +19,22 @@ def detect_technologies(headers: dict[str, Any], html_text: str) -> dict[str, li
     if powered_by:
         confirmed.append({"name": powered_by, "source": "header", "confidence": "confirmed"})
 
-    for header_name in ("x-generator", "generator"):
-        value = headers.get(header_name)
+    for name in ("x-generator", "generator"):
+        value = headers.get(name)
         if value:
             confirmed.append({"name": str(value), "source": "header", "confidence": "confirmed"})
 
     soup = BeautifulSoup(html_text or "", "html.parser")
-    if soup.find("script", src=True):
-        scripts = [str(script.get("src", "")).lower() for script in soup.find_all("script", src=True)]
-        for script in scripts:
-            if "jquery" in script:
-                confirmed.append({"name": "jquery", "source": "html", "confidence": "confirmed"})
-            if "bootstrap" in script:
-                confirmed.append({"name": "bootstrap", "source": "html", "confidence": "confirmed"})
+    scripts = [str(script.get("src", "")).lower() for script in soup.find_all("script", src=True)]
+    for script in scripts:
+        if "jquery" in script:
+            confirmed.append({"name": "jquery", "source": "html", "confidence": "confirmed"})
+        if "bootstrap" in script:
+            confirmed.append({"name": "bootstrap", "source": "html", "confidence": "confirmed"})
 
-    generator_meta = soup.find("meta", attrs={"name": "generator"})
-    if generator_meta:
-        generator_value = str(generator_meta.get("content", "")).strip()
+    meta_generator = soup.find("meta", attrs={"name": "generator"})
+    if meta_generator:
+        generator_value = str(meta_generator.get("content", "")).strip()
         if generator_value:
             suspected.append({"name": generator_value, "source": "html", "confidence": "suspected"})
 
