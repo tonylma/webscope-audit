@@ -8,6 +8,7 @@ F3_TECHNIQUES = {
     "F1004": {"name": "Access with Stolen Session Cookie", "tactic": "initial-access", "source": "f3"},
     "F1005.003": {"name": "Account Manipulation: Add Beneficiary", "tactic": "positioning", "source": "f3"},
     "F1006": {"name": "Account Takeover", "tactic": "initial-access", "source": "f3"},
+    "F1025": {"name": "Electronic Funds Transfer", "tactic": "monetization", "source": "f3"},
     "F1002.001": {"name": "Abuse of Public-Facing API: Mobile API Abuse", "tactic": "positioning", "source": "f3"},
     "F1031": {"name": "Impersonate Account Holder", "tactic": "initial-access", "source": "f3"},
     "F1032": {"name": "Impersonate Official", "tactic": "initial-access", "source": "f3"},
@@ -205,7 +206,7 @@ def evaluate_mobile_money_event(data: dict) -> dict:
             ["MM-06", "MM-08"], ())
         f3_tactics.add("monetization")
         if data.get("channel") == "bank_transfer":
-            technique_ids.add("F1025.003")
+            technique_ids.add("F1025")
 
     score = min(score, 100)
     level = "critical" if score >= 75 else "high" if score >= 50 else "medium" if score >= 25 else "low"
