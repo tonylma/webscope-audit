@@ -152,7 +152,7 @@ def inspect_file_bytes(content: bytes) -> dict:
         "static_indicators": matches,
         "risk_score": score,
         "risk_level": level,
-        "disposition": "quarantined_manual_review",
+        "disposition": "static_review_required",
         "execution_performed": False,
         "archive_extraction_performed": False,
         "network_access_performed": False,
