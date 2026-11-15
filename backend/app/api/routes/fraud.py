@@ -157,6 +157,15 @@ def update_case(case_id: int, payload: FraudCaseUpdate,
     record = db.query(FraudCase).filter(FraudCase.id == case_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Dossier antifraude introuvable.")
+    allowed_transitions = {
+        "open": {"open", "under_review", "escalated", "false_positive"},
+        "under_review": {"under_review", "open", "escalated", "resolved", "false_positive"},
+        "escalated": {"escalated", "under_review", "resolved", "false_positive"},
+        "resolved": {"resolved", "open"},
+        "false_positive": {"false_positive", "open"},
+    }
+    if payload.status not in allowed_transitions.get(record.status, set()):
+        raise HTTPException(status_code=409, detail=f"Transition interdite : {record.status} → {payload.status}.")
     try:
         record.status = payload.status
         record.reviewed_by_user_id = user.id
