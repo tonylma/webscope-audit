@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from app.api.routes.auth import current_user, require_roles
+from app.api.routes.auth import require_roles
 from app.db.user_models import User
 from app.services.audit_log import append_event
 from app.services.defense_engine import analyze_url, inspect_file_bytes
 from app.services.clamav_service import scan_with_clamav
+from app.core.config import get_settings
 
 router = APIRouter(prefix="/defense", tags=["defense"])
 
@@ -31,7 +32,7 @@ def url_analysis(payload: UrlAnalysisRequest, user: User = Depends(require_roles
 
 @router.post("/file-triage")
 async def file_triage(file: UploadFile = File(...), user: User = Depends(require_roles("security_analyst"))):
-    maximum = 25_000_000
+    maximum = get_settings().max_download_size_bytes
     sample = await file.read(maximum + 1)
     if len(sample) > maximum:
         await file.close()
@@ -39,6 +40,10 @@ async def file_triage(file: UploadFile = File(...), user: User = Depends(require
     try:
         result = inspect_file_bytes(sample)
         antivirus = scan_with_clamav(sample)
+        if antivirus.get('status') == 'malware_detected':
+            result['risk_level'] = 'critical'
+            result['risk_score'] = 100
+            result['verdict'] = 'malware_detected_by_clamav'
         audit = append_event("defense.file_triage", user.username, {
             "sha256": result["sha256"], "size_bytes": result["size_bytes"],
             "file_type": result["file_type"], "risk_level": result["risk_level"],
