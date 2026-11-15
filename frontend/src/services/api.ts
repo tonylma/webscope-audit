@@ -1,6 +1,6 @@
 import axios from 'axios';
 import type {
-  AdminUser, FraudControl, FraudEvaluation, FraudForm, HistoryItem, LoginResponse,
+  AdminUser, FraudCaseDetail, FraudCaseSummary, FraudControl, FraudEvaluation, FraudForm, HistoryItem, LoginResponse,
   Report, ScanResult, StaticFileResult, UrlAnalysis, UserInfo,
 } from '../types';
 
@@ -42,7 +42,7 @@ export async function createUser(payload: {username: string; display_name: strin
   const response = await api.post('/auth/users', payload);
   return response.data;
 }
-export async function revokeUserSessions(userId: number) {
+export async function updateUser(userId: number, changes: {role?: string; is_active?: boolean; display_name?: string}) {\n  const response = await api.patch(`/auth/users/${userId}`, changes);\n  return response.data;\n}\nexport async function resetUserPassword(userId: number, new_password: string) {\n  const response = await api.post(`/auth/users/${userId}/reset-password`, {new_password});\n  return response.data;\n}\nexport async function revokeUserSessions(userId: number) {
   const response = await api.post(`/auth/users/${userId}/revoke`);
   return response.data;
 }
@@ -96,3 +96,16 @@ export async function getAuditStatus(): Promise<{valid: boolean; entries_checked
   return response.data;
 }
 export default api;
+
+export async function getFraudCases(params: {status?: string; limit?: number; offset?: number} = {}): Promise<{total: number; cases: FraudCaseSummary[]}> {
+  const response = await api.get('/fraud/cases', {params});
+  return response.data;
+}
+export async function getFraudCase(caseId: number): Promise<FraudCaseDetail> {
+  const response = await api.get(`/fraud/cases/${caseId}`);
+  return response.data;
+}
+export async function updateFraudCase(caseId: number, payload: {status: string; review_note?: string}) {
+  const response = await api.patch(`/fraud/cases/${caseId}`, payload);
+  return response.data;
+}
