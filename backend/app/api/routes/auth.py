@@ -119,3 +119,31 @@ def revoke_user_sessions(user_id: int, actor: User = Depends(require_roles("admi
     db.commit()
     append_event("auth.sessions_revoked", actor.username, {"user_id": user.id})
     return {"success": True}
+
+class UserUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    role: str | None = None
+    is_active: bool | None = None
+    display_name: str | None = Field(default=None, min_length=2, max_length=120)
+
+@router.patch("/users/{user_id}")
+def update_user(user_id: int, payload: UserUpdateRequest,
+                actor: User = Depends(require_roles("admin")), db: Session = Depends(get_db)):
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+    changes = payload.model_dump(exclude_unset=True)
+    if "role" in changes and changes["role"] not in ALLOWED_ROLES:
+        raise HTTPException(status_code=422, detail="Rôle inconnu.")
+    if target.id == actor.id and (changes.get("is_active") is False or changes.get("role", "admin") != "admin"):
+        raise HTTPException(status_code=400, detail="Un administrateur ne peut pas désactiver ou rétrograder sa propre session.")
+    for field, value in changes.items():
+        setattr(target, field, value)
+    if changes.get("is_active") is False:
+        target.token_version += 1
+    db.commit()
+    append_event("auth.user_updated", actor.username, {
+        "user_id": target.id, "updated_fields": sorted(changes.keys()), "role": target.role,
+        "is_active": target.is_active,
+    })
+    return {"id": target.id, "username": target.username, "role": target.role, "is_active": target.is_active}
