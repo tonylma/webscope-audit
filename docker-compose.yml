@@ -8,19 +8,32 @@ services:
     environment:
       POSTGRES_DB: webscope
       POSTGRES_USER: webscope
-      POSTGRES_PASSWORD: webscope
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
-      - '5432:5432'
+      - '127.0.0.1:5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U webscope -d webscope"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
     container_name: webscope-redis
     restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}"]
     ports:
-      - '6379:6379'
+      - '127.0.0.1:6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}" , "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
@@ -29,14 +42,29 @@ services:
     container_name: webscope-backend
     restart: unless-stopped
     env_file:
-      - ./backend/.env.example
+      - ./.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://webscope:${POSTGRES_PASSWORD}@postgres:5432/webscope
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
+      WEBSCOPE_AUDIT_LOG_PATH: /data/audit-chain.jsonl
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
-      - '8000:8000'
+      - '127.0.0.1:8000:8000'
     volumes:
       - ./backend:/app
+      - audit_data:/data
+    read_only: false
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 256
 
   frontend:
     build:
@@ -47,10 +75,12 @@ services:
     depends_on:
       - backend
     ports:
-      - '5173:5173'
+      - '127.0.0.1:5173:5173'
     volumes:
       - ./frontend:/app
       - /app/node_modules
 
 volumes:
   postgres_data:
+  redis_data:
+  audit_data:
