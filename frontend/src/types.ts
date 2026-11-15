@@ -46,7 +46,10 @@ export interface FraudForm {
   shared_beneficiary_accounts_24h: string; rapid_cashout: boolean;
   channel: 'wallet' | 'bank_transfer' | 'cashout' | 'merchant' | 'unknown';
 }
-export interface FraudCaseSummary { id: number; case_token: string; status: string; risk_score: number; risk_level: string; created_at: string; updated_at: string; }\nexport interface FraudCaseDetail { id: number; case_token: string; status: string; risk_score: number; risk_level: string; created_at: string; updated_at: string; input: Record<string, any>; evaluation: FraudEvaluation; review_note?: string | null; }\nexport interface FraudEvaluation {
+export interface FraudCaseSummary { id: number; case_token: string; status: string; risk_score: number; risk_level: string; created_at: string; updated_at: string; }
+export interface FraudCaseDetail { id: number; case_token: string; status: string; risk_score: number; risk_level: string; created_at: string; updated_at: string; input: Record<string, any>; evaluation: FraudEvaluation; review_note?: string | null; }
+export interface FraudEvaluation {
+  case_id?: number; case_status?: string; case_token?: string;
   risk_score: number; risk_level: string;
   signals: {rule_id: string; label: string; points: number; severity: string;
     explanation: string; recommended_controls: string[]}[];
