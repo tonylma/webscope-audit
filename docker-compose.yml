@@ -16,6 +16,19 @@ services:
       timeout: 5s
       retries: 5
 
+  clamav:
+    image: clamav/clamav:stable
+    restart: unless-stopped
+    volumes:
+      - clamav_data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --ping 1 --wait >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
+    # No host port is published: clamd is reachable only on the Compose network.
+
   backend:
     build:
       context: ./backend
@@ -26,33 +39,46 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://webscope:${POSTGRES_PASSWORD}@postgres:5432/webscope
       WEBSCOPE_AUDIT_LOG_PATH: /data/audit-chain.jsonl
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
     depends_on:
       postgres:
         condition: service_healthy
+      clamav:
+        condition: service_started
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
-      - ./backend:/app
       - audit_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
     pids_limit: 256
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     restart: unless-stopped
+    environment:
+      VITE_API_URL: http://localhost:8000
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "127.0.0.1:5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
 
 volumes:
   postgres_data:
   audit_data:
+  clamav_data:
