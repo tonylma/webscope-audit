@@ -3,34 +3,24 @@ from __future__ import annotations
 import hmac
 import os
 import re
-import secrets
 from collections import defaultdict, deque
 from typing import Deque
 
-from fastapi import Header, HTTPException, status
+from fastapi import HTTPException, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-def require_analyst_key(x_analyst_key: str | None = Header(default=None, alias="X-Analyst-Key")) -> None:
-    configured = os.getenv("WEBSCOPE_ANALYST_API_KEY", "").strip()
-    if len(configured) < 32 or configured.lower() in {"change-me", "replace-me", "development"}:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail="Accès analyste désactivé : configurez une clé forte WEBSCOPE_ANALYST_API_KEY.")
-    if not x_analyst_key or not hmac.compare_digest(x_analyst_key, configured):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Clé analyste invalide.")
-
 def require_secret(name: str) -> bytes:
     value = os.getenv(name, "").strip()
     if len(value) < 32 or value.lower() in {"change-me", "replace-me", "development"}:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=f"Configuration requise : {name} doit contenir au moins 32 caractères aléatoires.")
+        raise RuntimeError(f"{name} doit contenir au moins 32 caractères aléatoires.")
     return value.encode("utf-8")
 
 def pseudonymize(value: str, context: str = "ref") -> str:
+    import hashlib
     key = require_secret("WEBSCOPE_PSEUDONYMIZATION_KEY")
-    digest = hmac.new(key, f"{context}:{value}".encode("utf-8"), "sha256").hexdigest()
-    return digest
+    return hmac.new(key, f"{context}:{value}".encode("utf-8"), hashlib.sha256).hexdigest()
 
 def analyst_identity(raw: str | None) -> str:
     value = re.sub(r"[^A-Za-z0-9_.@-]", "", raw or "analyst")[:80]
@@ -45,10 +35,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
         response.headers.setdefault("Cache-Control", "no-store")
         response.headers.setdefault("Cross-Origin-Resource-Policy", "same-site")
+        response.headers.setdefault("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+        if request.url.scheme == "https" or request.headers.get("x-forwarded-proto", "").lower() == "https":
+            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         return response
 
 class InMemoryRateLimitMiddleware(BaseHTTPMiddleware):
-    """Single-process emergency guard; use a gateway/Redis limiter for multi-worker production."""
+    """Single-process fallback; deploy a shared API gateway/Redis limiter for multiple workers."""
     def __init__(self, app, max_requests: int = 60, window_seconds: int = 60):
         super().__init__(app)
         self.max_requests = max_requests
@@ -56,13 +49,8 @@ class InMemoryRateLimitMiddleware(BaseHTTPMiddleware):
         self.requests: dict[str, Deque[float]] = defaultdict(deque)
 
     async def dispatch(self, request: Request, call_next) -> Response:
-        if request.url.path == "/health" or not (
-            request.url.path.startswith("/scan") or
-            request.url.path.startswith("/defense") or
-            request.url.path.startswith("/fraud")
-        ):
+        if request.url.path == "/health":
             return await call_next(request)
-
         import time
         now = time.monotonic()
         client = request.client.host if request.client else "unknown"
