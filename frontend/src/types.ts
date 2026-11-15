@@ -55,7 +55,7 @@ export interface FraudEvaluation {
     explanation: string; recommended_controls: string[]}[];
   recommended_actions: string[];
   mitre_f3: {version: string; tactics: string[]; techniques: {id: string; name: string; tactic: string; source: string}[]; framework_url: string};
-  decision_note: string; case_token?: string;
+  decision_note: string;
   audit?: {timestamp: string; entry_hash: string};
 }
 export interface FraudControl {
