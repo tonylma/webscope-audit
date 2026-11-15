@@ -1,17 +1,28 @@
-.PHONY: up down install frontend backend
+from pydantic import AnyHttpUrl, BaseModel, Field, ConfigDict
 
-up:
-	docker compose up --build
+class ScanCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    url: AnyHttpUrl
 
-down:
-	docker compose down -v
+class ScanResult(BaseModel):
+    id: int
+    target_url: str
+    status: str
+    risk_score: int
+    summary: str
 
-install:
-	cd backend && python -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
-	cd frontend && npm install
+class FindingOut(BaseModel):
+    category: str
+    title: str
+    severity: str
+    description: str
+    evidence: str
 
-backend:
-	cd backend && . .venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-frontend:
-	cd frontend && npm run dev
+class ScanReport(BaseModel):
+    scan_id: int
+    summary: str
+    risk_score: int
+    status: str
+    findings: list[FindingOut] = Field(default_factory=list)
+    subdomains: list[dict] = Field(default_factory=list)
+    urls: list[dict] = Field(default_factory=list)
