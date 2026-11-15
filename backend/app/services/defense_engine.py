@@ -76,7 +76,7 @@ def analyze_url(raw_url: str) -> dict:
     try:
         address = ipaddress.ip_address(hostname)
         if not address.is_global:
-            add("NON_PUBLIC_IP", "Adresse IP non publique", 35, "L’URL pointe vers une adresse IP privée ou spéciale. Ne pas l’ouvrir depuis un poste métier.", "critical")
+            add("NON_PUBLIC_IP", "Adresse IP non publique", 80, "L’URL pointe vers une adresse IP privée ou spéciale. Ne pas l’ouvrir depuis un poste métier.", "critical")
         else:
             add("IP_LITERAL", "Adresse IP utilisée comme hôte", 15, "Les campagnes de phishing utilisent parfois directement des adresses IP.", "medium")
     except ValueError:
