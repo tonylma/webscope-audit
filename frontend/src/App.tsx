@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import {
-  analyzeUrl, createScan, createUser, evaluateFraud, getAuditStatus, getFraudControls,
-  getHistory, getReport, getUsers, login as loginApi, revokeUserSessions, setAccessToken, triageFile,
+  analyzeUrl, createScan, createUser, evaluateFraud, getAuditStatus, getFraudCase, getFraudCases, getFraudControls,
+  getHistory, getReport, getUsers, login as loginApi, resetUserPassword, revokeUserSessions, setAccessToken, triageFile,
+  updateFraudCase, updateUser,
 } from './services/api';
 import type {
-  AdminUser, FraudControl, FraudEvaluation, FraudForm, HistoryItem, Report, ScanResult,
+  AdminUser, FraudCaseDetail, FraudCaseSummary, FraudControl, FraudEvaluation, FraudForm, HistoryItem, Report, ScanResult,
   StaticFileResult, UrlAnalysis, UserInfo,
 } from './types';
 
@@ -57,6 +58,11 @@ function App() {
     setMessage('');
   };
 
+  const refreshCases = async () => {
+    try { const data = await getFraudCases({limit: 100}); setFraudCases(data.cases); setFraudCaseTotal(data.total); }
+    catch (cause: any) { fail(cause); }
+  };
+
   const refreshHistory = async () => {
     try {
       const data = await getHistory();
@@ -64,7 +70,7 @@ function App() {
     } catch (cause: any) { fail(cause); }
   };
 
-  const signIn = async (event: React.FormEvent) => {
+  const signIn = async (event: FormEvent) => {
     event.preventDefault(); clearNotices(); setBusy(true);
     try {
       const response = await loginApi(username, password);
@@ -79,14 +85,15 @@ function App() {
   const signOut = () => {
     setAccessToken(null); setUser(null); setResult(null); setReport(null);
     setUrlAnalysis(null); setFileResult(null); setFraudResult(null);
-    setControls([]); setUsers([]); setAuditStatus(null); setMessage('Session terminée.');
+    setControls([]); setUsers([]); setFraudCases([]); setSelectedCase(null); setAuditStatus(null); setMessage('Session terminée.');
   };
 
   useEffect(() => {
     if (!user) return;
     if (user.role !== 'reader') void refreshHistory();
-    if (user.role === 'fraud_analyst' || user.role === 'auditor' || user.role === 'admin') {
+    if (user.role === 'fraud_analyst' || user.role === 'auditor' || user.role === 'admin' || user.role === 'reader') {
       void getFraudControls().then(data => setControls(data.controls)).catch(fail);
+      void refreshCases();
     }
     if (user.role === 'admin') void getUsers().then(data => setUsers(data.users)).catch(fail);
   }, [user]);
@@ -126,16 +133,17 @@ function App() {
     setFraudForm(current => ({ ...current, [key]: value }));
   };
 
-  const runFraudAssessment = async (event: React.FormEvent) => {
+  const runFraudAssessment = async (event: FormEvent) => {
     event.preventDefault(); clearNotices(); setBusy(true);
     try {
       setFraudResult(await evaluateFraud(fraudForm));
-      setMessage('Triage antifraude terminé. Le score est une aide à la décision et non une preuve.');
+      await refreshCases();
+      setMessage('Triage antifraude terminé. Le dossier est enregistré chiffré en base ; le score est une aide à la décision et non une preuve.');
     } catch (cause: any) { fail(cause); }
     finally { setBusy(false); }
   };
 
-  const addUser = async (event: React.FormEvent) => {
+  const addUser = async (event: FormEvent) => {
     event.preventDefault(); clearNotices(); setBusy(true);
     try {
       await createUser({...newUser, email: newUser.email || undefined});
@@ -152,6 +160,57 @@ function App() {
       await revokeUserSessions(id);
       setUsers((await getUsers()).users);
       setMessage('Sessions de ce compte révoquées.');
+    } catch (cause: any) { fail(cause); }
+  };
+
+  const openFraudCase = async (caseId: number) => {
+    clearNotices();
+    try {
+      const detail = await getFraudCase(caseId);
+      setSelectedCase(detail);
+      setCaseStatus(detail.status);
+      setCaseNote(detail.review_note || '');
+    } catch (cause: any) { fail(cause); }
+  };
+
+  const saveFraudCase = async () => {
+    if (!selectedCase || !canFraud) return;
+    clearNotices(); setBusy(true);
+    try {
+      await updateFraudCase(selectedCase.id, {status: caseStatus, review_note: caseNote});
+      await refreshCases();
+      await openFraudCase(selectedCase.id);
+      setMessage('Dossier antifraude mis à jour et journalisé.');
+    } catch (cause: any) { fail(cause); }
+    finally { setBusy(false); }
+  };
+
+  const changeUserRole = async (id: number, role: string) => {
+    clearNotices();
+    try {
+      await updateUser(id, {role});
+      setUsers((await getUsers()).users);
+      setMessage('Rôle utilisateur mis à jour ; les anciens jetons ont été révoqués.');
+    } catch (cause: any) { fail(cause); }
+  };
+
+  const toggleUserActive = async (item: AdminUser) => {
+    clearNotices();
+    try {
+      await updateUser(item.id, {is_active: !item.is_active});
+      setUsers((await getUsers()).users);
+      setMessage(item.is_active ? 'Compte désactivé.' : 'Compte réactivé.');
+    } catch (cause: any) { fail(cause); }
+  };
+
+  const submitPasswordReset = async (event: FormEvent) => {
+    event.preventDefault();
+    if (resetUserId === '') return;
+    clearNotices();
+    try {
+      await resetUserPassword(resetUserId, resetPassword);
+      setResetPassword('');
+      setMessage('Mot de passe réinitialisé ; toutes les sessions précédentes ont été révoquées.');
     } catch (cause: any) { fail(cause); }
   };
 
@@ -336,7 +395,40 @@ function App() {
               <h3>Actions recommandées</h3>
               <ul>{fraudResult.recommended_actions.map(action => <li key={action}>{action}</li>)}</ul>
               <p className="notice">{fraudResult.decision_note}</p>
-              {fraudResult.case_token && <small>Référence pseudonymisée : {fraudResult.case_token}</small>}
+              {fraudResult.case_id && <p className="notice">Dossier enregistré : #{fraudResult.case_id} · Statut : {fraudResult.case_status}. Les données originales et le résultat sont chiffrés au repos (AES-256-GCM).</p>}
+              {fraudResult.case_token && <small>Jeton pseudonymisé : {fraudResult.case_token}</small>}
+            </div>}
+          </section>
+          <section className="panel">
+            <div className="row"><h2 className="grow">Dossiers antifraude persistés</h2><button className="secondary" onClick={refreshCases}>Actualiser ({fraudCaseTotal})</button></div>
+            <div className="table-wrap"><table><thead><tr><th>Dossier</th><th>Créé</th><th>Score</th><th>Niveau</th><th>Statut</th><th>Consultation</th></tr></thead><tbody>
+              {fraudCases.map(item => <tr key={item.id}>
+                <td>#{item.id}<br/><small>{item.case_token.slice(0, 12)}…</small></td>
+                <td>{new Date(item.created_at).toLocaleString()}</td>
+                <td>{item.risk_score}/100</td>
+                <td><span className={'badge ' + item.risk_level}>{item.risk_level}</span></td>
+                <td>{item.status}</td>
+                <td>{(canFraud || canAudit) ? <button className="secondary" onClick={() => openFraudCase(item.id)}>Ouvrir</button> : <small>Résumé uniquement</small>}</td>
+              </tr>)}
+              {fraudCases.length === 0 && <tr><td colSpan={6} className="muted">Aucun dossier enregistré.</td></tr>}
+            </tbody></table></div>
+            {selectedCase && <div className="stack" style={{marginTop: 16}}>
+              <div className="row"><h3 className="grow">Dossier #{selectedCase.id}</h3><span className={'badge ' + selectedCase.risk_level}>{selectedCase.risk_level} · {selectedCase.risk_score}/100</span></div>
+              <p className="muted">Référence pseudonymisée : {selectedCase.case_token} · Statut : {selectedCase.status}</p>
+              <div className="signal">
+                <h4>Informations du dossier déchiffrées pour l’analyste habilité</h4>
+                <p>Référence source : {String(selectedCase.input?.case_reference || 'Non renseignée')}</p>
+                <p>Événements : changement SIM {String(selectedCase.input?.sim_change_hours ?? 'n/a')} h · transactions/10 min {String(selectedCase.input?.transactions_10m ?? 0)} · canal {String(selectedCase.input?.channel || 'unknown')}</p>
+                <p>Signaux : {selectedCase.evaluation?.signals?.map(signal => signal.label).join(' ; ') || 'Aucun signal'}</p>
+                {selectedCase.review_note && <p>Dernière note de revue : {selectedCase.review_note}</p>}
+              </div>
+              {canFraud && <div className="stack">
+                <div><label htmlFor="case-status">Nouveau statut</label><select id="case-status" value={caseStatus} onChange={e => setCaseStatus(e.target.value)}>
+                  <option value="open">Ouvert</option><option value="under_review">En revue</option><option value="escalated">Escaladé</option><option value="resolved">Résolu</option><option value="false_positive">Faux positif</option>
+                </select></div>
+                <div><label htmlFor="case-note">Note de revue (chiffrée au repos)</label><textarea id="case-note" rows={3} value={caseNote} onChange={e => setCaseNote(e.target.value)} /></div>
+                <div className="actions"><button disabled={busy} onClick={saveFraudCase}>Enregistrer le suivi</button></div>
+              </div>}
             </div>}
           </section>
           <section className="panel">
@@ -372,8 +464,27 @@ function App() {
           <section className="panel">
             <div className="row"><h2 className="grow">Comptes & rôles</h2><button className="secondary" onClick={() => getUsers().then(data => setUsers(data.users)).catch(fail)}>Actualiser</button></div>
             <div className="table-wrap"><table><thead><tr><th>Utilisateur</th><th>Rôle</th><th>État</th><th>Action</th></tr></thead><tbody>
-              {users.map(item => <tr key={item.id}><td>{item.display_name}<br/><small>{item.username}</small></td><td>{roleLabels[item.role] || item.role}</td><td>{item.is_active ? 'Actif' : 'Désactivé'}</td><td><button className="secondary" disabled={item.id === user.id} onClick={() => revokeSessions(item.id)}>Révoquer sessions</button></td></tr>)}
+              {users.map(item => <tr key={item.id}>
+                <td>{item.display_name}<br/><small>{item.username}</small></td>
+                <td><select aria-label={'Rôle de ' + item.username} value={item.role} disabled={item.id === user.id} onChange={e => changeUserRole(item.id, e.target.value)}>
+                  <option value="admin">Administrateur</option><option value="security_analyst">Analyste sécurité</option><option value="fraud_analyst">Analyste fraude</option><option value="auditor">Auditeur</option><option value="reader">Lecture seule</option>
+                </select></td>
+                <td><span className={item.is_active ? 'success' : 'muted'}>{item.is_active ? 'Actif' : 'Désactivé'}</span></td>
+                <td className="row">
+                  <button className="secondary" disabled={item.id === user.id} onClick={() => toggleUserActive(item)}>{item.is_active ? 'Désactiver' : 'Réactiver'}</button>
+                  <button className="secondary" disabled={item.id === user.id} onClick={() => revokeSessions(item.id)}>Révoquer sessions</button>
+                </td></tr>)}
             </tbody></table></div>
+          </section>
+          <section className="panel">
+            <h2>Réinitialiser un mot de passe</h2>
+            <form className="row" onSubmit={submitPasswordReset}>
+              <div className="grow"><label htmlFor="reset-user">Compte</label><select id="reset-user" required value={resetUserId} onChange={e => setResetUserId(e.target.value ? Number(e.target.value) : '')}>
+                <option value="">Sélectionner un utilisateur</option>{users.map(item => <option key={item.id} value={item.id}>{item.username} ({roleLabels[item.role]})</option>)}
+              </select></div>
+              <div className="grow"><label htmlFor="reset-password">Nouveau mot de passe (14 caractères minimum)</label><input id="reset-password" type="password" minLength={14} required value={resetPassword} onChange={e => setResetPassword(e.target.value)} /></div>
+              <button disabled={busy || resetUserId === ''}>Réinitialiser</button>
+            </form>
           </section>
           <section className="panel">
             <div className="row"><h2 className="grow">Intégrité du journal d’audit</h2><button className="secondary" onClick={checkAuditChain}>Vérifier la chaîne HMAC</button></div>
