@@ -7,6 +7,7 @@ from app.api.routes.auth import current_user, require_roles
 from app.db.user_models import User
 from app.services.audit_log import append_event
 from app.services.defense_engine import analyze_url, inspect_file_bytes
+from app.services.clamav_service import scan_with_clamav
 
 router = APIRouter(prefix="/defense", tags=["defense"])
 
@@ -37,13 +38,15 @@ async def file_triage(file: UploadFile = File(...), user: User = Depends(require
         raise HTTPException(status_code=413, detail="Fichier trop volumineux (25 Mo maximum).")
     try:
         result = inspect_file_bytes(sample)
+        antivirus = scan_with_clamav(sample)
         audit = append_event("defense.file_triage", user.username, {
             "sha256": result["sha256"], "size_bytes": result["size_bytes"],
             "file_type": result["file_type"], "risk_level": result["risk_level"],
             "execution_performed": False,
+            "antivirus_status": antivirus["status"],
         })
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=422 if isinstance(exc, ValueError) else 503, detail="Analyse impossible ou journal d'audit non configuré.") from exc
     finally:
         await file.close()
-    return {**result, "audit": audit}
+    return {**result, "antivirus": antivirus, "audit": audit}
