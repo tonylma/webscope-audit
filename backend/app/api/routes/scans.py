@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from app.core.security import require_analyst_key
+from app.api.routes.auth import require_roles
 
-router = APIRouter(tags=["history"], dependencies=[Depends(require_analyst_key)])
+router = APIRouter(tags=["history"], dependencies=[Depends(require_roles("security_analyst", "fraud_analyst", "auditor", "reader"))])
 SCAN_STORE: dict[int, dict] = {}
 
 @router.get("/history")
