@@ -10,6 +10,7 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks: [isolated]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U webscope -d webscope"]
       interval: 10s
@@ -21,13 +22,14 @@ services:
     restart: unless-stopped
     volumes:
       - clamav_data:/var/lib/clamav
+    networks: [isolated, egress]
     healthcheck:
       test: ["CMD-SHELL", "clamdscan --ping 1 --wait >/dev/null 2>&1"]
       interval: 30s
       timeout: 10s
       retries: 10
       start_period: 180s
-    # No host port is published: clamd is reachable only on the Compose network.
+    # No host port is published. Only the backend can reach clamd on the isolated network.
 
   backend:
     build:
@@ -41,6 +43,7 @@ services:
       WEBSCOPE_AUDIT_LOG_PATH: /data/audit-chain.jsonl
       CLAMAV_HOST: clamav
       CLAMAV_PORT: 3310
+      CLAMAV_MAX_BYTES: 25000000
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,6 +53,7 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - audit_data:/data
+    networks: [isolated]
     read_only: true
     tmpfs:
       - /tmp:size=64m,noexec,nosuid,nodev
@@ -77,8 +81,15 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:5173:5173"
+    networks: [isolated]
 
 volumes:
   postgres_data:
   audit_data:
   clamav_data:
+
+networks:
+  isolated:
+    internal: true
+  egress:
+    # ClamAV needs outbound access to refresh malware signatures. The API and DB do not.
