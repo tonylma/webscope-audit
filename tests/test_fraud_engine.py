@@ -14,7 +14,7 @@ def test_mobile_money_rules_map_to_f3_and_controls():
     assert result["risk_level"] == "critical"
     assert result["risk_score"] == 100
     ids = {item["id"] for item in result["mitre_f3"]["techniques"]}
-    assert {"F1005.003", "F1006", "T1219", "T1566.004", "F1025.003"} <= ids
+    assert {"F1005.003", "F1006", "T1219", "T1566.004", "F1025"} <= ids
     controls = {control for signal in result["signals"] for control in signal["recommended_controls"]}
     assert {"MM-01", "MM-02", "MM-04", "MM-05", "MM-06"} <= controls
     assert result["decision_note"].startswith("Aide au triage uniquement")
