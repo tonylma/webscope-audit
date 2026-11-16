@@ -48,7 +48,7 @@ services:
       postgres:
         condition: service_healthy
       clamav:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
