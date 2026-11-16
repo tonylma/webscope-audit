@@ -44,7 +44,7 @@ def _verify_open_file(source: TextIO, key: bytes) -> dict:
             canonical = _canonical(entry)
             expected_hash = hashlib.sha256(canonical).hexdigest()
             expected_signature = hmac.new(key, canonical, hashlib.sha256).hexdigest()
-        except (json.JSONDecodeError, TypeError, ValueError):
+        except (json.JSONDecodeError, TypeError, ValueError, AttributeError):
             return {"valid": False, "entries_checked": checked, "invalid_line": line_number,
                     "reason": "malformed_entry", "last_hash": previous_hash}
         if (entry.get("previous_hash") != previous_hash
@@ -60,6 +60,7 @@ def append_event(event_type: str, actor: str, details: dict) -> dict:
     key = _key()
     path = _path()
     with _THREAD_LOCK, path.open("a+", encoding="utf-8") as output:
+        output.seek(0)
         # portalocker coordinates threads/processes on Linux, macOS and Windows.
         portalocker.lock(output, portalocker.LOCK_EX)
         try:
@@ -91,6 +92,7 @@ def verify_chain() -> dict:
     key = _key()
     path = _path()
     with _THREAD_LOCK, path.open("a+", encoding="utf-8") as source:
+        source.seek(0)
         portalocker.lock(source, portalocker.LOCK_SH)
         try:
             return _verify_open_file(source, key)
