@@ -5,6 +5,7 @@ import os
 from urllib.parse import urlsplit
 
 from app.core.auth import _jwt_secret
+from app.services.audit_log import verify_chain
 
 SECRET_NAMES = ("WEBSCOPE_AUDIT_HMAC_KEY", "WEBSCOPE_PSEUDONYMIZATION_KEY")
 
@@ -34,3 +35,8 @@ def validate_security_configuration() -> None:
         raise RuntimeError("ACCESS_TOKEN_MINUTES doit être compris entre 5 et 60.")
     if not os.getenv("WEBSCOPE_AUDIT_LOG_PATH", "/data/audit-chain.jsonl").strip():
         raise RuntimeError("WEBSCOPE_AUDIT_LOG_PATH est obligatoire.")
+    chain = verify_chain()
+    if not chain["valid"]:
+        raise RuntimeError(
+            f"Journal HMAC invalide à la ligne {chain.get('invalid_line')} ; démarrage refusé."
+        )
