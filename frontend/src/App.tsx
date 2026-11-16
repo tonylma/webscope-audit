@@ -62,6 +62,13 @@ function App() {
 
   const clearNotices = () => { setError(''); setMessage(''); };
   const fail = (cause: any) => {
+    if (cause?.response?.status === 401) {
+      setAccessToken(null);
+      setUser(null);
+      setError('Session expirée ou révoquée. Connecte-toi à nouveau.');
+      setMessage('');
+      return;
+    }
     setError(cause?.response?.data?.detail || cause?.message || 'Une erreur est survenue.');
     setMessage('');
   };
@@ -98,7 +105,7 @@ function App() {
 
   useEffect(() => {
     if (!user) return;
-    if (user.role !== 'reader') void refreshHistory();
+    if (user.role !== 'fraud_analyst') void refreshHistory();
     if (user.role === 'fraud_analyst' || user.role === 'auditor' || user.role === 'admin' || user.role === 'reader') {
       void getFraudControls().then(data => setControls(data.controls)).catch(fail);
       void refreshCases();
@@ -113,6 +120,7 @@ function App() {
       const scan = await createScan(url, authorizedScope);
       setResult(scan);
       setReport(await getReport(scan.id));
+      setAuthorizedScope(false);
       await refreshHistory();
       setMessage('Audit web autorisé terminé. Le scan est limité au DNS public et à HTTP/HTTPS, sans téléchargement de fichiers.');
     } catch (cause: any) { fail(cause); }
@@ -282,7 +290,7 @@ function App() {
             <p className="muted">Audit public réel et borné : résolution DNS publique, contrôle des en-têtes HTTP, certificat TLS, quelques chemins sensibles par requête HEAD et références HTML internes. Aucun fichier n’est téléchargé ni exécuté. Les redirections externes ne sont pas suivies.</p>
             {canSecurity ? <>
               <div className="row">
-                <div className="grow"><label htmlFor="surface-url">URL du site public autorisé</label><input id="surface-url" type="url" required value={url} onChange={e => setUrl(e.target.value)} /></div>
+                <div className="grow"><label htmlFor="surface-url">URL du site public autorisé</label><input id="surface-url" type="url" required value={url} onChange={e => { setUrl(e.target.value); setAuthorizedScope(false); }} /></div>
               </div>
               <label className="check"><input type="checkbox" checked={authorizedScope} onChange={e => setAuthorizedScope(e.target.checked)} /> Je confirme disposer de l’autorisation du propriétaire pour auditer ce domaine et les chemins publics testés.</label>
               <div className="actions"><button disabled={busy || !authorizedScope} onClick={runSurfaceCheck}>{busy ? 'Audit en cours…' : 'Lancer l’audit autorisé'}</button></div>
