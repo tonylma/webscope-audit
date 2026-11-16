@@ -144,11 +144,15 @@ def list_cases(status_filter: str | None = Query(default=None, alias="status", p
     }
 
 @router.get("/cases/{case_id}")
-def get_case(case_id: int, _: User = Depends(require_roles("fraud_analyst", "auditor")),
+def get_case(case_id: int, user: User = Depends(require_roles("fraud_analyst", "auditor")),
              db: Session = Depends(get_db)):
     record = db.query(FraudCase).filter(FraudCase.id == case_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Dossier antifraude introuvable.")
+    try:
+        append_event("fraud.case_viewed", user.username, {"case_id": record.id, "status": record.status})
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Lecture bloquée : journal d'audit non disponible.") from exc
     return _decrypt_case(record)
 
 @router.patch("/cases/{case_id}")
