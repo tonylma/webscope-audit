@@ -15,3 +15,6 @@ os.environ.setdefault("WEBSCOPE_DATA_ENCRYPTION_KEY", "AAAAAAAAAAAAAAAAAAAAAAAAA
 os.environ.setdefault("WEBSCOPE_AUDIT_LOG_PATH", "/tmp/webscope-test-audit.jsonl")
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:5173")
 os.environ.setdefault("ACCESS_TOKEN_MINUTES", "20")
+os.environ.setdefault("WEBSCOPE_BOOTSTRAP_ADMIN_USERNAME", "test-admin")
+os.environ.setdefault("WEBSCOPE_BOOTSTRAP_ADMIN_PASSWORD", "Test-only-bootstrap-admin-passphrase-2026!")
+os.environ.setdefault("ENVIRONMENT", "development")
