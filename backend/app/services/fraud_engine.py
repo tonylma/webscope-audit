@@ -171,7 +171,7 @@ def evaluate_mobile_money_event(data: dict) -> dict:
             ["MM-04"], ())
 
     if data.get("social_engineering_reported"):
-        add("SOCIAL-ENGINEERING", "Signalement de phishing, smishing ou vishing", 25, "high",
+        add("SOCIAL-ENGINEERING", "Signalement de phishing ou smishing", 25, "high",
             "Un signalement social-engineering associé à une transaction impose une vérification hors bande.",
             ["MM-03", "MM-01"], ("T1660",))
     if data.get("phone_number_spoofing_suspected"):
@@ -249,7 +249,9 @@ def evaluate_mobile_money_event(data: dict) -> dict:
         f3_tactics.add("monetization")
         if data.get("channel") == "bank_transfer":
             technique_ids.add("F1025")
-        elif data.get("channel") in {"wallet", "cashout"}:
+        elif data.get("channel") == "wallet":
+            technique_ids.add("F1025.001")
+        elif data.get("channel") == "cashout":
             technique_ids.add("F1047")
 
     score = min(score, 100)
