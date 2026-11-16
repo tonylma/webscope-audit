@@ -54,6 +54,7 @@ def test_authorized_scan_is_bounded_and_does_not_download_files(monkeypatch):
                 "x-frame-options": "DENY",
                 "referrer-policy": "no-referrer",
             },
+            "content_type": "text/html",
             "content_length": "46",
             "body": b'<html><a href="/about">About</a><img src="/sample.apk"></html>',
             "body_truncated": False,
