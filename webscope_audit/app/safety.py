@@ -24,11 +24,10 @@ def normalize_url(value: str) -> str:
 
     try:
         ip = ipaddress.ip_address(hostname)
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
-            raise ValueError("L'URL cible ne doit pas pointer vers un hôte interne ou privé.")
-    except ValueError as exc:
-        if str(exc) == "" or "is not a valid" not in str(exc):
-            raise
+    except ValueError:
+        ip = None
+    if ip is not None and (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved):
+        raise ValueError("L'URL cible ne doit pas pointer vers un hôte interne ou privé.")
 
     port = split.port
     netloc = hostname if port in (None, 80, 443) else f"{hostname}:{port}"

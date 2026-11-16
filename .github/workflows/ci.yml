@@ -1,0 +1,75 @@
+name: WebScope CI
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: sqlite:////tmp/webscope-ci.sqlite3
+      ENVIRONMENT: development
+      CORS_ORIGINS: http://localhost:5173
+      ACCESS_TOKEN_MINUTES: "20"
+      WEBSCOPE_JWT_SECRET: "ci-only-jwt-secret-0123456789abcdef0123456789abcdef"
+      WEBSCOPE_AUDIT_HMAC_KEY: "ci-only-audit-hmac-0123456789abcdef0123456789"
+      WEBSCOPE_PSEUDONYMIZATION_KEY: "ci-only-pseudonym-key-0123456789abcdef0123456789"
+      WEBSCOPE_DATA_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      WEBSCOPE_AUDIT_LOG_PATH: /tmp/webscope-ci-audit.jsonl
+      WEBSCOPE_BOOTSTRAP_ADMIN_USERNAME: ci-admin
+      WEBSCOPE_BOOTSTRAP_ADMIN_PASSWORD: "CI-only-bootstrap-passphrase-2026!"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pip-audit
+      - name: Compile backend
+        run: python -m compileall -q backend/app
+      - name: Run backend tests
+        env:
+          PYTHONPATH: backend
+        run: pytest -q --cov=app --cov-report=term-missing
+      - name: Validate FastAPI startup and bootstrap administrator
+        env:
+          PYTHONPATH: backend
+        run: |
+          python - <<'PY'
+          from app.main import initialize_database_and_admin
+          initialize_database_and_admin()
+          print("FastAPI startup checks and administrator bootstrap passed")
+          PY
+      - name: Static security analysis
+        run: bandit -r backend/app --severity-level high --confidence-level high
+      - name: Dependency vulnerability audit
+        run: pip-audit -r backend/requirements.txt
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+      - name: Frontend dependency audit
+        working-directory: frontend
+        run: npm audit --audit-level=high
+      - name: TypeScript and production build
+        working-directory: frontend
+        run: npm run build

@@ -27,13 +27,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-crawl", action="store_true", help="Désactiver l'exploration légère")
     parser.add_argument("--no-docx", action="store_true", help="Ne pas produire l'export Word")
     parser.add_argument("--no-pdf", action="store_true", help="Ne pas produire l'export PDF")
+    parser.add_argument("--authorized-scope", action="store_true", help="Confirmer une autorisation explicite sur la cible")
     parser.add_argument("--gui", action="store_true", help="Lancer l'interface graphique Tkinter")
     return parser
 
 
 def launch_gui() -> None:
     import tkinter as tk
-    from tkinter import ttk
+    from tkinter import ttk, messagebox
 
     root = tk.Tk()
     root.title("WebScope Audit V4")
@@ -54,6 +55,8 @@ def launch_gui() -> None:
     summary.grid(row=4, column=0, sticky="nsew", pady=(12, 0))
 
     def run_analysis() -> None:
+        if not messagebox.askyesno("Confirmation de périmètre", "Confirmez-vous que vous êtes autorisé à auditer cette cible publique ?"):
+            return
         config = AppConfig(
             target_url=target_var.get(),
             output_dir=output_var.get(),
@@ -85,6 +88,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.gui:
         launch_gui()
         return 0
+
+    if not args.authorized_scope:
+        parser.error("L'option --authorized-scope est obligatoire pour lancer un audit.")
 
     config = AppConfig(
         target_url=args.target,

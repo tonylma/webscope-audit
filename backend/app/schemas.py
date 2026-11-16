@@ -3,6 +3,7 @@ from pydantic import AnyHttpUrl, BaseModel, Field, ConfigDict
 class ScanCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     url: AnyHttpUrl
+    authorized_scope: bool = False
 
 class ScanResult(BaseModel):
     id: int

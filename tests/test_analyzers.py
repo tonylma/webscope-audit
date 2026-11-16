@@ -1,6 +1,7 @@
 from webscope_audit.app.dns_analyzer import analyze_dns
 from webscope_audit.app.subdomain_discovery import discover_subdomains
 from webscope_audit.app.technology_detector import detect_technologies
+import dns.resolver
 
 
 class StubResolver:
@@ -9,7 +10,7 @@ class StubResolver:
             return ["93.184.216.34"]
         if hostname.startswith("www.") and record_type == "A":
             return ["93.184.216.34"]
-        raise Exception("No record")
+        raise dns.resolver.NXDOMAIN
 
 
 def test_analyze_dns_collects_records():

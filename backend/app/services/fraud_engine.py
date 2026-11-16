@@ -1,21 +1,42 @@
 from __future__ import annotations
 
-F3_VERSION = "1.1"
-F3_FRAMEWORK_URL = "https://ctid.mitre.org/fraud/"
+F3_VERSION = "1.2"
+F3_FRAMEWORK_URL = "https://ctid.mitre.org/fightfraud/"
+F3_TACTICS = [
+    "reconnaissance",
+    "resource-development",
+    "initial-access",
+    "stealth",
+    "defense-impairment",
+    "positioning",
+    "execution",
+    "monetization",
+]
 
 F3_TECHNIQUES = {
-    "F1003": {"name": "Abuse SMS verification", "tactic": "execution", "source": "f3"},
-    "F1004": {"name": "Access with Stolen Session Cookie", "tactic": "initial-access", "source": "f3"},
-    "F1005.003": {"name": "Account Manipulation: Add Beneficiary", "tactic": "positioning", "source": "f3"},
-    "F1006": {"name": "Account Takeover", "tactic": "initial-access", "source": "f3"},
-    "F1002.001": {"name": "Abuse of Public-Facing API: Mobile API Abuse", "tactic": "positioning", "source": "f3"},
-    "F1031": {"name": "Impersonate Account Holder", "tactic": "initial-access", "source": "f3"},
-    "F1032": {"name": "Impersonate Official", "tactic": "initial-access", "source": "f3"},
-    "F1040": {"name": "Phone Number Spoofing", "tactic": "stealth", "source": "f3"},
-    "T1219": {"name": "Remote Access Tools", "tactic": "positioning", "source": "attack"},
-    "T1453": {"name": "Abuse Accessibility Features", "tactic": "positioning", "source": "attack"},
-    "T1113": {"name": "Screen Capture", "tactic": "positioning", "source": "attack"},
-    "T1566.004": {"name": "Phishing: Spearphishing Voice", "tactic": "initial-access", "source": "attack"},
+    "F1002": {"name": "Abuse of Public-Facing API", "tactics": ["initial-access", "execution", "positioning"], "source": "f3"},
+    "F1003": {"name": "Abuse SMS verification", "tactics": ["execution"], "source": "f3"},
+    "F1004": {"name": "Access with Stolen Session Cookie", "tactics": ["initial-access"], "source": "f3"},
+    "F1005.003": {"name": "Account Manipulation: Add Beneficiary", "tactics": ["positioning", "defense-impairment"], "source": "f3"},
+    "F1006": {"name": "Account Takeover", "tactics": ["initial-access"], "source": "f3"},
+    "F1025": {"name": "Electronic Funds Transfer", "tactics": ["monetization"], "source": "f3"},
+    "F1025.001": {"name": "Electronic Funds Transfer: Peer-to-Peer Transfer", "tactics": ["monetization"], "source": "f3"},
+    "F1025.003": {"name": "Electronic Funds Transfer: Wire Transfer", "tactics": ["monetization"], "source": "f3"},
+    "F1031": {"name": "Impersonate Account Holder", "tactics": ["initial-access", "stealth"], "source": "f3"},
+    "F1032": {"name": "Impersonate Official", "tactics": ["initial-access", "stealth"], "source": "f3"},
+    "F1040": {"name": "Phone Number Spoofing", "tactics": ["stealth", "reconnaissance", "initial-access"], "source": "f3"},
+    "F1047": {"name": "Transfer of Funds", "tactics": ["monetization"], "source": "f3"},
+    "F1049": {"name": "Use Money Mule", "tactics": ["positioning", "stealth"], "source": "f3"},
+    "F1050": {"name": "Operate Fraudulent Call Centers", "tactics": ["resource-development", "initial-access"], "source": "f3"},
+    "F1056": {"name": "Impersonate Trusted Person", "tactics": ["initial-access", "stealth"], "source": "f3"},
+    "T1111": {"name": "Multi-Factor Authentication Interception", "tactics": ["initial-access"], "source": "f3"},
+    "T1113": {"name": "Screen Capture", "tactics": ["positioning"], "source": "f3"},
+    "T1219": {"name": "Remote Access Tools", "tactics": ["positioning"], "source": "f3"},
+    "T1451": {"name": "SIM Card Swap", "tactics": ["initial-access"], "source": "f3"},
+    "T1453": {"name": "Abuse Accessibility Features", "tactics": ["positioning"], "source": "f3"},
+    "T1557": {"name": "Adversary-in-the-Middle", "tactics": ["initial-access", "positioning", "execution"], "source": "f3"},
+    "T1621": {"name": "Multi-Factor Authentication Request Generation", "tactics": ["initial-access"], "source": "f3"},
+    "T1660": {"name": "Phishing", "tactics": ["initial-access"], "source": "f3"},
 }
 
 CONTROL_CATALOG = [
@@ -107,17 +128,17 @@ def evaluate_mobile_money_event(data: dict) -> dict:
         for technique_id in techniques:
             if technique_id in F3_TECHNIQUES:
                 technique_ids.add(technique_id)
-                f3_tactics.add(F3_TECHNIQUES[technique_id]["tactic"])
+                f3_tactics.update(F3_TECHNIQUES[technique_id]["tactics"])
 
     sim_age = data.get("sim_change_hours")
     if sim_age is not None and sim_age <= 2:
         add("SIM-RECENT-02H", "Changement SIM très récent", 35, "critical",
             "Le changement SIM dans les deux dernières heures augmente le risque de détournement du canal OTP.",
-            ["MM-01", "MM-03"], ("F1003", "F1006"))
+            ["MM-01", "MM-03"], ("T1451",))
     elif sim_age is not None and sim_age <= 72:
         add("SIM-RECENT-72H", "Changement SIM récent", 22, "high",
             "Un changement SIM récent doit déclencher une vérification indépendante avant opération sensible.",
-            ["MM-01", "MM-03"], ("F1003", "F1006"))
+            ["MM-01", "MM-03"], ("T1451",))
 
     beneficiary_age = data.get("beneficiary_age_minutes")
     if data.get("beneficiary_added") and beneficiary_age is not None and beneficiary_age <= 60:
@@ -150,13 +171,35 @@ def evaluate_mobile_money_event(data: dict) -> dict:
             ["MM-04"], ())
 
     if data.get("social_engineering_reported"):
-        add("SOCIAL-ENGINEERING", "Signalement de phishing, smishing ou vishing", 25, "high",
+        add("SOCIAL-ENGINEERING", "Signalement de phishing ou smishing", 25, "high",
             "Un signalement social-engineering associé à une transaction impose une vérification hors bande.",
-            ["MM-03", "MM-01"], ("F1031", "F1032", "T1566.004"))
+            ["MM-03", "MM-01"], ("T1660",))
     if data.get("phone_number_spoofing_suspected"):
         add("CALLER-ID-SPOOFING", "Usurpation possible du numéro appelant", 15, "medium",
             "Le numéro affiché n’est pas une preuve d’identité de l’appelant.",
             ["MM-03"], ("F1040",))
+
+    if data.get("vishing_reported"):
+        add("VISHING-REPORTED", "Signalement de vishing / fraude téléphonique", 25, "high",
+            "Un appel frauduleux peut usurper une personne de confiance pour faire révéler des codes ou autoriser un transfert.",
+            ["MM-03", "MM-09"], ("F1031", "F1032", "F1056", "T1660"))
+    if data.get("fraudulent_call_center_suspected"):
+        add("FRAUD-CALL-CENTER", "Centre d'appels frauduleux suspecté", 25, "high",
+            "Un centre d'appels frauduleux peut industrialiser l'usurpation d'identité, le vishing et la collecte de codes.",
+            ["MM-03", "MM-09"], ("F1050",))
+    if data.get("caller_impersonation_suspected"):
+        add("CALLER-IMPERSONATION", "Usurpation d'un conseiller ou d'un proche", 20, "high",
+            "Vérifier l'identité par un canal indépendant et préenregistré, jamais via le numéro entrant.",
+            ["MM-03"], ("F1031", "F1032", "F1056"))
+    if data.get("mfa_interception_suspected"):
+        add("MFA-INTERCEPTION", "Interception présumée d'un facteur d'authentification", 30, "critical",
+            "Des codes ou validations MFA peuvent être interceptés via SIM swap, malware, relais ou ingénierie sociale.",
+            ["MM-01", "MM-03", "MM-04"], ("T1111",))
+    if data.get("mfa_request_generation_suspected"):
+        add("MFA-REQUEST-GENERATION", "Rafale de demandes MFA / fatigue OTP", 20, "high",
+            "Des demandes d'authentification répétées peuvent pousser le titulaire à valider une demande frauduleuse.",
+            ["MM-03", "MM-09"], ("T1621",))
+
     if data.get("otp_failures_15m", 0) >= 5:
         add("OTP-FAILURES", "Échecs OTP répétés", 15, "medium",
             "Des échecs rapprochés peuvent signaler une tentative de deviner, intercepter ou détourner le second facteur.",
@@ -173,7 +216,7 @@ def evaluate_mobile_money_event(data: dict) -> dict:
     if data.get("mobile_api_anomaly"):
         add("MOBILE-API-ANOMALY", "Anomalie d’utilisation de l’API mobile", 25, "high",
             "Le comportement API diffère du profil attendu et doit être corrélé avec les journaux de session.",
-            ["MM-04", "MM-09"], ("F1002.001",))
+            ["MM-04", "MM-09"], ("F1002",))
 
     velocity = data.get("transactions_10m", 0)
     if velocity >= 10:
@@ -198,14 +241,18 @@ def evaluate_mobile_money_event(data: dict) -> dict:
     if data.get("shared_beneficiary_accounts_24h", 0) >= 3:
         add("SHARED-BENEFICIARY", "Bénéficiaire partagé par plusieurs comptes", 20, "high",
             "Un bénéficiaire commun à plusieurs comptes en peu de temps peut indiquer un réseau de collecte.",
-            ["MM-06", "MM-05"], ())
+            ["MM-06", "MM-05"], ("F1049",))
     if data.get("rapid_cashout"):
         add("RAPID-CASHOUT", "Cash-out rapide après réception", 20, "high",
             "La conversion rapide des fonds reçus est un signal de monétisation à corréler au contexte.",
             ["MM-06", "MM-08"], ())
         f3_tactics.add("monetization")
         if data.get("channel") == "bank_transfer":
-            technique_ids.add("F1025.003")
+            technique_ids.add("F1025")
+        elif data.get("channel") == "wallet":
+            technique_ids.add("F1025.001")
+        elif data.get("channel") == "cashout":
+            technique_ids.add("F1047")
 
     score = min(score, 100)
     level = "critical" if score >= 75 else "high" if score >= 50 else "medium" if score >= 25 else "low"

@@ -1,21 +1,22 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
-from app.core.security import require_analyst_key
+from app.api.routes.auth import require_roles
+from app.db.models import ScanRecord
+from app.db.session import get_db
 
-router = APIRouter(tags=["history"], dependencies=[Depends(require_analyst_key)])
-SCAN_STORE: dict[int, dict] = {}
+router = APIRouter(tags=["history"])
 
 @router.get("/history")
-def get_history():
-    scans = []
-    for scan_id, item in sorted(SCAN_STORE.items(), reverse=True):
-        scans.append({
-            "id": scan_id,
-            "target_url": item.get("target_url", ""),
-            "status": "completed",
-            "risk_score": item.get("risk_score", 0),
-            "summary": item.get("summary", ""),
-        })
-    return {"scans": scans}
+def get_history(_: object = Depends(require_roles("security_analyst", "fraud_analyst", "auditor", "reader")),
+                db: Session = Depends(get_db)):
+    records = db.query(ScanRecord).order_by(ScanRecord.created_at.desc()).limit(100).all()
+    return {"scans": [{
+        "id": item.id,
+        "target_url": item.target_url,
+        "status": item.status,
+        "risk_score": item.risk_score,
+        "summary": item.summary,
+    } for item in records]}
