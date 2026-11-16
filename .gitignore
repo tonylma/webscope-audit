@@ -1,19 +1,32 @@
-# .gitignore
-
+# Python
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
 *.pyd
 .venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Secrets and local configuration
 .env
 .env.*
-.pytest_cache/
-.idea/
-.vscode/
+!.env.example
+
+# Node
 node_modules/
 dist/
 build/
-*.log
-.DS_Store
 coverage/
-__snapshots__/
+
+# IDE and OS
+.idea/
+.vscode/
+.DS_Store
+*.log
+
+# Local runtime data
+*.sqlite
+*.sqlite3
+*.db
+reports/generated/
