@@ -40,7 +40,9 @@ export interface FraudForm {
   beneficiary_age_minutes: string; remote_access_tool_detected: boolean;
   accessibility_abuse_detected: boolean; screen_capture_detected: boolean;
   app_integrity_warning: boolean; social_engineering_reported: boolean;
-  phone_number_spoofing_suspected: boolean; otp_failures_15m: string;
+  vishing_reported: boolean; fraudulent_call_center_suspected: boolean;
+  caller_impersonation_suspected: boolean; mfa_interception_suspected: boolean;
+  mfa_request_generation_suspected: boolean; phone_number_spoofing_suspected: boolean; otp_failures_15m: string;
   new_device: boolean; impossible_travel: boolean; mobile_api_anomaly: boolean;
   transactions_10m: string; amount_vs_30d_median: string;
   shared_beneficiary_accounts_24h: string; rapid_cashout: boolean;
@@ -54,7 +56,7 @@ export interface FraudEvaluation {
   signals: {rule_id: string; label: string; points: number; severity: string;
     explanation: string; recommended_controls: string[]}[];
   recommended_actions: string[];
-  mitre_f3: {version: string; tactics: string[]; techniques: {id: string; name: string; tactic: string; source: string}[]; framework_url: string};
+  mitre_f3: {version: string; tactics: string[]; techniques: {id: string; name: string; tactics: string[]; source: string}[]; framework_url: string};
   decision_note: string;
   audit?: {timestamp: string; entry_hash: string};
 }
