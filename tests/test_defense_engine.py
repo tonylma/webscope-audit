@@ -70,5 +70,7 @@ def test_authorized_scan_is_bounded_and_does_not_download_files(monkeypatch):
     assert result["limits"]["files_downloaded"] is False
     assert result["files"] == []
     assert any(item["url"] == "https://example.com/about" for item in result["urls"])
-    assert all("sample.apk" not in item["url"] for item in result["urls"])
+    # HTML resource references may be listed, but no linked file is downloaded or stored.
+    assert result["files"] == []
+    assert any(item["url"].endswith("/sample.apk") for item in result["urls"])
     assert result["limits"]["ports"] == [80, 443]
