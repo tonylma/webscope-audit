@@ -15,7 +15,7 @@ from app.db.session import get_db
 from app.db.user_models import User
 from app.services.audit_log import append_event, verify_chain
 from app.services.crypto_service import decrypt_sensitive_data, encrypt_sensitive_data
-from app.services.fraud_engine import CONTROL_CATALOG, F3_FRAMEWORK_URL, F3_VERSION, evaluate_mobile_money_event
+from app.services.fraud_engine import CONTROL_CATALOG, F3_FRAMEWORK_URL, F3_TACTICS, F3_VERSION, evaluate_mobile_money_event
 
 router = APIRouter(prefix="/fraud", tags=["mobile-money-fraud"])
 
