@@ -8,7 +8,6 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = False
     database_url: str = Field(min_length=10)
-    max_scan_depth: int = Field(default=1, ge=0, le=3)
     max_urls_per_scan: int = Field(default=40, ge=1, le=100)
     max_download_size_bytes: int = Field(default=25_000_000, ge=1_000, le=25_000_000)
     timeout_seconds: int = Field(default=8, ge=1, le=30)
