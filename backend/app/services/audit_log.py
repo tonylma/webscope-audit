@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TextIO
 
-from fcntl import LOCK_EX, LOCK_SH, LOCK_UN, flock
+import portalocker
 
 _THREAD_LOCK = threading.RLock()
 _ZERO_HASH = "0" * 64
@@ -60,8 +60,8 @@ def append_event(event_type: str, actor: str, details: dict) -> dict:
     key = _key()
     path = _path()
     with _THREAD_LOCK, path.open("a+", encoding="utf-8") as output:
-        # flock coordinates multiple Uvicorn workers/containers sharing the same local volume.
-        flock(output.fileno(), LOCK_EX)
+        # portalocker coordinates threads/processes on Linux, macOS and Windows.
+        portalocker.lock(output, portalocker.LOCK_EX)
         try:
             verification = _verify_open_file(output, key)
             if not verification["valid"]:
@@ -84,15 +84,15 @@ def append_event(event_type: str, actor: str, details: dict) -> dict:
             output.flush()
             os.fsync(output.fileno())
         finally:
-            flock(output.fileno(), LOCK_UN)
+            portalocker.unlock(output)
     return {"timestamp": body["timestamp"], "entry_hash": entry_hash}
 
 def verify_chain() -> dict:
     key = _key()
     path = _path()
     with _THREAD_LOCK, path.open("a+", encoding="utf-8") as source:
-        flock(source.fileno(), LOCK_UN)
+        portalocker.unlock(source)
         try:
             return _verify_open_file(source, key)
         finally:
-            flock(source.fileno(), LOCK_SH)
+            portalocker.lock(source, portalocker.LOCK_SH)
