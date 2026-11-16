@@ -13,9 +13,12 @@ import dns.resolver
 from bs4 import BeautifulSoup
 
 from app.services.defense_engine import analyze_url
+from app.core.config import get_settings
 
 MAX_RESPONSE_BYTES = 64 * 1024
-MAX_PATH_PROBES = 14
+MAX_PATH_PROBES = min(14, get_settings().max_urls_per_scan)
+MAX_URLS_TO_RETURN = get_settings().max_urls_per_scan
+REQUEST_TIMEOUT = float(get_settings().timeout_seconds)
 MAX_SUBDOMAINS = 12
 REQUEST_TIMEOUT = 4.0
 
@@ -352,7 +355,7 @@ def run_scan(target_url: str, authorized_scope: bool = False) -> dict[str, Any]:
         "hostname": hostname,
         "dns_records": dns_records,
         "subdomains": subdomains,
-        "urls": urls[:50],
+        "urls": urls[:MAX_URLS_TO_RETURN],
         "files": files,
         "findings": findings,
         "signals": signals,
