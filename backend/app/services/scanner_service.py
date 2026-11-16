@@ -228,6 +228,7 @@ def run_scan(target_url: str, authorized_scope: bool = False) -> dict[str, Any]:
 
     current_url = normalized_url
     page: dict[str, Any] | None = None
+    redirect_limit_reached = False
     for redirect_index in range(4):
         page = _request_public(current_url, method="GET", max_bytes=MAX_RESPONSE_BYTES)
         redirect_chain.append(current_url)
@@ -243,14 +244,17 @@ def run_scan(target_url: str, authorized_scope: bool = False) -> dict[str, Any]:
                 "La redirection sort du domaine autorisé ; elle n'a pas été suivie.",
             )
             break
+        if redirect_index == 3:
+            redirect_limit_reached = True
+            break
         current_url = next_url
     if page is None:
         raise RuntimeError("Le scanner n'a pas pu récupérer la réponse HTTP.")
     scheme = urlsplit(current_url).scheme.lower()
     status_code = int(page["status_code"])
-    if status_code in {301, 302, 303, 307, 308}:
+    if redirect_limit_reached:
         _add_signal(signals, "REDIRECT_LIMIT_REACHED", "Limite de redirections atteinte", 5, "low",
-                    "Le scanner a atteint sa limite de redirections même sur la même origine.")
+                    "Le scanner a atteint sa limite de trois redirections suivies sur la même origine.")
     headers = page["headers"]
     if status_code >= 500:
         _add_signal(signals, "HTTP_SERVER_ERROR", "Erreur HTTP côté serveur", 12, "medium",
