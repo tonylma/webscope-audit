@@ -20,7 +20,6 @@ MAX_PATH_PROBES = min(14, get_settings().max_urls_per_scan)
 MAX_URLS_TO_RETURN = get_settings().max_urls_per_scan
 REQUEST_TIMEOUT = float(get_settings().timeout_seconds)
 MAX_SUBDOMAINS = 12
-REQUEST_TIMEOUT = 4.0
 
 COMMON_SUBDOMAINS = (
     "www", "api", "app", "m", "mobile", "portal", "cdn", "static", "assets",
