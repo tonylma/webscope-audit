@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TextIO
 
-from fcntl import LOCK_EX, LOCK_SH, flock
+from fcntl import LOCK_EX, LOCK_SH, LOCK_UN, flock
 
 _THREAD_LOCK = threading.RLock()
 _ZERO_HASH = "0" * 64
@@ -84,7 +84,7 @@ def append_event(event_type: str, actor: str, details: dict) -> dict:
             output.flush()
             os.fsync(output.fileno())
         finally:
-            flock(output.fileno(), LOCK_EX)
+            flock(output.fileno(), LOCK_UN)
     return {"timestamp": body["timestamp"], "entry_hash": entry_hash}
 
 def verify_chain() -> dict:
