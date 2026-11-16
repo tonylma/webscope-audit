@@ -91,8 +91,8 @@ def verify_chain() -> dict:
     key = _key()
     path = _path()
     with _THREAD_LOCK, path.open("a+", encoding="utf-8") as source:
-        portalocker.unlock(source)
+        portalocker.lock(source, portalocker.LOCK_SH)
         try:
             return _verify_open_file(source, key)
         finally:
-            portalocker.lock(source, portalocker.LOCK_SH)
+            portalocker.unlock(source)
