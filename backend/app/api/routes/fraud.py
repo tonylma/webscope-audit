@@ -30,6 +30,11 @@ class FraudEventRequest(BaseModel):
     screen_capture_detected: bool = False
     app_integrity_warning: bool = False
     social_engineering_reported: bool = False
+    vishing_reported: bool = False
+    fraudulent_call_center_suspected: bool = False
+    caller_impersonation_suspected: bool = False
+    mfa_interception_suspected: bool = False
+    mfa_request_generation_suspected: bool = False
     phone_number_spoofing_suspected: bool = False
     otp_failures_15m: int = Field(default=0, ge=0, le=10000)
     new_device: bool = False
@@ -70,8 +75,7 @@ def _decrypt_case(case: FraudCase) -> dict:
 def framework(_: User = Depends(require_roles("fraud_analyst", "auditor", "reader"))):
     return {
         "name": "MITRE Fight Fraud Framework", "version": F3_VERSION, "url": F3_FRAMEWORK_URL,
-        "tactics": ["reconnaissance", "resource-development", "initial-access", "stealth",
-                    "positioning", "execution", "monetization", "defense-impairment"],
+        "tactics": F3_TACTICS,
         "note": "ATT&CK décrit les opérations techniques ; F3 relie l'accès, le positionnement, l'exécution et la monétisation de la fraude.",
     }
 
