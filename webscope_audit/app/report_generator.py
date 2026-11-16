@@ -13,6 +13,7 @@ def render_report_html(scan_result: dict) -> str:
         loader=FileSystemLoader(str(template_dir)),
         autoescape=select_autoescape(["html", "xml"]),
     )
+    env.globals["len"] = len
     template = env.get_template("report.html")
     enriched = dict(scan_result)
     enriched["risk"] = build_risk_overview(scan_result)
