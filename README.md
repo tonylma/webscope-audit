@@ -31,7 +31,7 @@ Le scanner API utilise des résolutions DNS contrôlées et se connecte directem
 
 - Triage de signaux liés au SIM swap, OTP, phishing/smishing/vishing, RAT, abus d'accessibilité et intégrité applicative.
 - Signaux transactionnels : vélocité, montant atypique, bénéficiaires partagés et cash-out.
-- Correspondances initiales MITRE Fight Fraud Framework (F3) et MITRE ATT&CK.
+- Correspondances MITRE Fight Fraud Framework (F3) v1.2 et MITRE ATT&CK (SIM swap T1451, phishing T1660, call centers F1050, MFA T1111/T1621, monétisation F1025/F1047).
 - Catalogue de dix contrôles de première ligne pour les missions d'Internal Control Officer.
 - Dossiers antifraude persistés, notes de revue et statuts : `open`, `under_review`, `escalated`, `resolved`, `false_positive`.
 
@@ -70,7 +70,7 @@ Le journal fichier détecte les altérations, mais ne protège pas contre un adm
 - **Frontend :** React 18, TypeScript, Vite, Axios.
 - **Déploiement :** Docker Compose, conteneurs non-root, backend en lecture seule, réseaux privés, secrets en variables d'environnement.
 
-Le dépôt conserve également le package CLI historique `webscope_audit/`. Le backend API et la CLI sont deux parcours séparés ; le scanner HTTP de l'API est borné aux ports web et ne réactive pas les anciens modules de crawl/téléchargement.
+Le dépôt conserve également le package CLI historique `webscope_audit/` pour compatibilité. Il reste distinct de l'API et n'offre pas encore les mêmes garanties de résolution DNS épinglée, de confinement réseau et de gestion des redirections. Il demande une confirmation d'autorisation, mais **ne doit pas être utilisé pour des audits en environnement de production** tant que ses contrôles réseau n'ont pas été portés au même niveau que ceux de l'API. Les scans contrôlés doivent passer par l'API WebScope.
 
 ## Démarrage local avec Docker
 
