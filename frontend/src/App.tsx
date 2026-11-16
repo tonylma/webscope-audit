@@ -15,6 +15,8 @@ const initialFraud: FraudForm = {
   case_reference: '', sim_change_hours: '', beneficiary_added: false, beneficiary_age_minutes: '',
   remote_access_tool_detected: false, accessibility_abuse_detected: false,
   screen_capture_detected: false, app_integrity_warning: false, social_engineering_reported: false,
+  vishing_reported: false, fraudulent_call_center_suspected: false, caller_impersonation_suspected: false,
+  mfa_interception_suspected: false, mfa_request_generation_suspected: false,
   phone_number_spoofing_suspected: false, otp_failures_15m: '0', new_device: false,
   impossible_travel: false, mobile_api_anomaly: false, transactions_10m: '0',
   amount_vs_30d_median: '1', shared_beneficiary_accounts_24h: '0', rapid_cashout: false, channel: 'unknown',
@@ -389,7 +391,12 @@ function App() {
                 {([
                   ['beneficiary_added','Nouveau bénéficiaire ajouté'],['remote_access_tool_detected','RAT / outil de prise en main détecté'],
                   ['accessibility_abuse_detected','Abus des services d’accessibilité'],['screen_capture_detected','Capture d’écran anormale'],
-                  ['app_integrity_warning','Alerte d’intégrité de l’application'],['social_engineering_reported','Phishing / smishing / vishing signalé'],
+                  ['app_integrity_warning','Alerte d’intégrité de l’application'],['social_engineering_reported','Phishing / smishing signalé'],
+                  ['vishing_reported','Vishing / fraude téléphonique signalé'],
+                  ['fraudulent_call_center_suspected','Centre d’appels frauduleux suspecté'],
+                  ['caller_impersonation_suspected','Usurpation d’un conseiller ou d’un proche'],
+                  ['mfa_interception_suspected','Interception MFA / OTP suspectée'],
+                  ['mfa_request_generation_suspected','Rafale de demandes MFA / fatigue OTP'],
                   ['phone_number_spoofing_suspected','Usurpation possible du numéro appelant'],['new_device','Nouvel appareil'],
                   ['impossible_travel','Incohérence géographique de session'],['mobile_api_anomaly','Anomalie API mobile'],['rapid_cashout','Cash-out rapide après réception'],
                 ] as [keyof FraudForm,string][]).map(([key,label]) => <label className="check" key={key}>
@@ -411,7 +418,7 @@ function App() {
               </div>)}
               <h3>Correspondances MITRE F3 / ATT&CK</h3>
               <p className="muted">Tactiques : {fraudResult.mitre_f3.tactics.join(', ') || 'aucune correspondance déduite'}</p>
-              <ul>{fraudResult.mitre_f3.techniques.map(item => <li key={item.id}>{item.id} — {item.name} ({item.tactic})</li>)}</ul>
+              <ul>{fraudResult.mitre_f3.techniques.map(item => <li key={item.id}>{item.id} — {item.name} ({item.tactics.join(', ')})</li>)}</ul>
               <h3>Actions recommandées</h3>
               <ul>{fraudResult.recommended_actions.map(action => <li key={action}>{action}</li>)}</ul>
               <p className="notice">{fraudResult.decision_note}</p>
