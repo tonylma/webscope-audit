@@ -7,6 +7,7 @@ def test_mobile_money_rules_map_to_official_f3_v12_and_controls():
         "beneficiary_age_minutes": 20,
         "remote_access_tool_detected": True,
         "social_engineering_reported": True,
+        "otp_failures_15m": 5,
         "transactions_10m": 12,
         "rapid_cashout": True,
         "channel": "bank_transfer",
