@@ -8,7 +8,7 @@ from .risk_model import build_risk_overview, prioritize_recommendations
 
 
 def render_report_html(scan_result: dict) -> str:
-    template_dir = Path(__file__).resolve().parents[1] / "templates"
+    template_dir = Path(__file__).resolve().parents[2] / "templates"
     env = Environment(
         loader=FileSystemLoader(str(template_dir)),
         autoescape=select_autoescape(["html", "xml"]),
