@@ -45,6 +45,14 @@ function App() {
   const [controls, setControls] = useState<FraudControl[]>([]);
   const [auditStatus, setAuditStatus] = useState<{valid: boolean; entries_checked: number; last_hash: string} | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [fraudCases, setFraudCases] = useState<FraudCaseSummary[]>([]);
+  const [fraudCaseTotal, setFraudCaseTotal] = useState(0);
+  const [selectedCase, setSelectedCase] = useState<FraudCaseDetail | null>(null);
+  const [caseStatus, setCaseStatus] = useState('under_review');
+  const [caseNote, setCaseNote] = useState('');
+  const [resetUserId, setResetUserId] = useState<number | ''>('');
+  const [resetPassword, setResetPassword] = useState('');
+  const [authorizedScope, setAuthorizedScope] = useState(false);
   const [newUser, setNewUser] = useState({username: '', display_name: '', email: '', password: '', role: 'reader'});
 
   const canSecurity = user?.role === 'security_analyst' || user?.role === 'admin';
@@ -85,7 +93,7 @@ function App() {
   const signOut = () => {
     setAccessToken(null); setUser(null); setResult(null); setReport(null);
     setUrlAnalysis(null); setFileResult(null); setFraudResult(null);
-    setControls([]); setUsers([]); setFraudCases([]); setSelectedCase(null); setAuditStatus(null); setMessage('Session terminée.');
+    setControls([]); setUsers([]); setFraudCases([]); setFraudCaseTotal(0); setSelectedCase(null); setAuditStatus(null); setMessage('Session terminée.');
   };
 
   useEffect(() => {
@@ -101,11 +109,12 @@ function App() {
   const runSurfaceCheck = async () => {
     clearNotices(); setBusy(true);
     try {
-      const scan = await createScan(url);
+      if (!authorizedScope) throw new Error('Confirme que tu es autorisé à auditer ce domaine.');
+      const scan = await createScan(url, authorizedScope);
       setResult(scan);
       setReport(await getReport(scan.id));
       await refreshHistory();
-      setMessage('Analyse syntaxique terminée. Aucun accès réseau à la cible n’a été effectué.');
+      setMessage('Audit web autorisé terminé. Le scan est limité au DNS public et à HTTP/HTTPS, sans téléchargement de fichiers.');
     } catch (cause: any) { fail(cause); }
     finally { setBusy(false); }
   };
@@ -270,11 +279,14 @@ function App() {
         <>
           <section className="panel">
             <h2>Analyse d’URL et exposition potentielle</h2>
-            <p className="muted">La version actuelle analyse la syntaxe et les signaux d’hameçonnage sans effectuer de requête vers la cible. Les scans réseau actifs restent désactivés par défaut.</p>
-            {canSecurity ? <div className="row">
-              <div className="grow"><label htmlFor="surface-url">URL du site public autorisé</label><input id="surface-url" value={url} onChange={e => setUrl(e.target.value)} /></div>
-              <button disabled={busy} onClick={runSurfaceCheck}>{busy ? 'Analyse…' : 'Analyser'}</button>
-            </div> : <p className="notice">Ton rôle autorise la consultation de l’historique, pas le lancement d’analyses.</p>}
+            <p className="muted">Audit public réel et borné : résolution DNS publique, contrôle des en-têtes HTTP, certificat TLS, quelques chemins sensibles par requête HEAD et références HTML internes. Aucun fichier n’est téléchargé ni exécuté. Les redirections externes ne sont pas suivies.</p>
+            {canSecurity ? <>
+              <div className="row">
+                <div className="grow"><label htmlFor="surface-url">URL du site public autorisé</label><input id="surface-url" type="url" required value={url} onChange={e => setUrl(e.target.value)} /></div>
+              </div>
+              <label className="check"><input type="checkbox" checked={authorizedScope} onChange={e => setAuthorizedScope(e.target.checked)} /> Je confirme disposer de l’autorisation du propriétaire pour auditer ce domaine et les chemins publics testés.</label>
+              <div className="actions"><button disabled={busy || !authorizedScope} onClick={runSurfaceCheck}>{busy ? 'Audit en cours…' : 'Lancer l’audit autorisé'}</button></div>
+            </> : <p className="notice">Ton rôle autorise la consultation de l’historique, pas le lancement d’analyses.</p>}
           </section>
           {result && <section className="grid-3">
             <div className="stat"><span>Cible</span><strong>{result.target_url}</strong></div>
